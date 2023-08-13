@@ -2,6 +2,8 @@
 
 A terminal-based, units-aware, RPN calculator.
 
+![image](https://github.com/electronfraud/calc/assets/126712383/b6a02d8f-bdd5-4df5-90b3-91a5e7002430)
+
 * [How to Use](#how-to-use)
   * [The Stack](#the-stack)
   * [Units](#units)
