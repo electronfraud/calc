@@ -52,11 +52,27 @@ impl Number {
 
 impl std::fmt::Display for Number {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> Result<(), std::fmt::Error> {
+        let value = if self.value < 0.001 || self.value >= 10_000_000_000.0 {
+            let e = format!("{:.6e}", self.value);
+            let halves: Vec<&str> = e.splitn(2, 'e').collect();
+            halves[0]
+                .trim_end_matches('0')
+                .trim_end_matches('.')
+                .to_string()
+                + "e"
+                + halves[1]
+        } else {
+            format!("{:.6}", self.value)
+                .trim_end_matches('0')
+                .trim_end_matches('.')
+                .to_string()
+        };
+
         #[allow(clippy::map_unwrap_or)] // can't because of `f` borrow
         self.unit
             .as_ref()
-            .map(|u| write!(f, "[{} {u}]", self.value))
-            .unwrap_or_else(|| write!(f, "{}", self.value))
+            .map(|u| write!(f, "[{value} {u}]"))
+            .unwrap_or_else(|| write!(f, "{value}"))
     }
 }
 
