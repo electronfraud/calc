@@ -2,6 +2,18 @@
 
 A terminal-based, units-aware, RPN calculator.
 
+* [How to Use](#how-to-use)
+  * [The Stack](#the-stack)
+  * [Units](#units)
+  * [Readline](#readline)
+* [Reference](#reference)
+  * [Constants](#constants)
+  * [Commands](#commands)
+  * [Units](#units-1)
+* [About](#about)
+  * [License](#license)
+  * [Future Work](#future-work)
+
 ## How to Use
 
 Enter operands followed by the operator. The result is displayed in
