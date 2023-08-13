@@ -5,7 +5,6 @@ version = "0.1.0"
 readme = "README.md"
 authors = ["electronfraud <electronfraud@gmail.com>"]
 license = "GPL-3.0-or-later"
-license-file = "COPYING"
 edition = "2021"
 
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html

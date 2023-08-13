@@ -140,8 +140,7 @@ impl std::ops::Mul<&Unit> for &Number {
     /// Multiplies this number's unit by another unit. If the number has no
     /// unit, assigns the unit to the number.
     fn mul(self, other: &Unit) -> Number {
-        self.with_unit(
-            self.unit.as_ref().map_or(other.clone(), |u| u * other))
+        self.with_unit(self.unit.as_ref().map_or(other.clone(), |u| u * other))
     }
 }
 
@@ -168,8 +167,7 @@ impl std::ops::Div<&Unit> for &Number {
     /// Divides this number's unit by another unit. If the number has no unit,
     /// assigns the inverse of the unit to the number.
     fn div(self, other: &Unit) -> Number {
-        self.with_unit(
-            self.unit.as_ref().map_or(other.inverse(), |u| u / other))
+        self.with_unit(self.unit.as_ref().map_or(other.inverse(), |u| u / other))
     }
 }
 

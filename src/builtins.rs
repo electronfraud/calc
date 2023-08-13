@@ -128,7 +128,7 @@ pub fn builtin_mul(stack: &mut Stack) -> Result<(), Error> {
             return Ok(());
         }
         Err(stack::Error::TypeMismatch) => { /* do nothing */ }
-        Err(e) => return Err(Error::Stack(e))
+        Err(e) => return Err(Error::Stack(e)),
     }
 
     // `a` is a number and `b` is a unit
@@ -137,7 +137,7 @@ pub fn builtin_mul(stack: &mut Stack) -> Result<(), Error> {
             stack.push_number(&n * &u);
             Ok(())
         }
-        Err(e) => Err(Error::Stack(e))
+        Err(e) => Err(Error::Stack(e)),
     }
 }
 
@@ -168,7 +168,7 @@ pub fn builtin_div(stack: &mut Stack) -> Result<(), Error> {
             return Ok(());
         }
         Err(stack::Error::TypeMismatch) => { /* do nothing */ }
-        Err(e) => return Err(Error::Stack(e))
+        Err(e) => return Err(Error::Stack(e)),
     }
 
     // Two units
@@ -178,7 +178,7 @@ pub fn builtin_div(stack: &mut Stack) -> Result<(), Error> {
             return Ok(());
         }
         Err(stack::Error::TypeMismatch) => { /* do nothing */ }
-        Err(e) => return Err(Error::Stack(e))
+        Err(e) => return Err(Error::Stack(e)),
     }
 
     // `a` is a number and `b` is a unit
@@ -187,7 +187,7 @@ pub fn builtin_div(stack: &mut Stack) -> Result<(), Error> {
             stack.push_number(&n / &u);
             Ok(())
         }
-        Err(e) => Err(Error::Stack(e))
+        Err(e) => Err(Error::Stack(e)),
     }
 }
 
@@ -349,7 +349,7 @@ pub fn table() -> HashMap<&'static str, Builtin> {
         ),
         (
             "hbar",
-            constant!(Number::new(1.054571817e-34).with_unit(&*units::JOULE * &units::SECOND)),
+            constant!(Number::new(1.054_571_817e-34).with_unit(&*units::JOULE * &units::SECOND)),
         ),
         ("pi", constant!(Number::new(std::f64::consts::PI))),
         // Stack
