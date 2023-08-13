@@ -1,5 +1,7 @@
 # calc
 
+[![Rust](https://github.com/electronfraud/calc/actions/workflows/rust.yml/badge.svg)](https://github.com/electronfraud/calc/actions/workflows/rust.yml)
+
 A terminal-based, units-aware, RPN calculator.
 
 ![image](https://github.com/electronfraud/calc/assets/126712383/b6a02d8f-bdd5-4df5-90b3-91a5e7002430)
