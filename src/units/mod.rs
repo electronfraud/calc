@@ -31,8 +31,8 @@ pub use unit::Unit;
 #[derive(Debug)]
 pub enum Error {
     IncommensurableUnits(Option<Box<Unit>>, Option<Box<Unit>>),
-    TooManyBaseUnits(Box<Unit>),
-    NegativeExponent(Box<Unit>),
+    UninvertableUnits(Box<Unit>),
+    NonzeroZeroPoint(&'static Base),
 }
 
 #[allow(clippy::enum_glob_use)]
@@ -47,7 +47,7 @@ pub static KILOGRAM: Base = Base::new("kg", Mass, 1.0);
 /// SI base unit for electric current
 pub static AMPERE: Base = Base::new("A", Current, 1.0);
 /// SI base unit for thermodynamic temperature
-pub static KELVIN: Base = Base::new("K", Temperature, 1.0);
+pub static KELVIN: Base = Base::new("K", Temperature, 1.0).with_zero(0.0);
 /// SI base unit for amount of substance
 pub static MOLE: Base = Base::new("mol", AmountOfSubstance, 1.0);
 /// SI base unit for luminous intensity
@@ -69,26 +69,28 @@ pub static MILE: Base = Base::new("mi", Length, 1609.344);
 pub static NAUTICAL_MILE: Base = Base::new("NM", Length, 1852.0);
 
 // More temperatures
-pub static CELSIUS: Base = Base::new("degC", Temperature, 1.0).with_zero(-273.15);
-pub static FAHRENHEIT: Base = Base::new("degF", Temperature, 5.0 / 9.0).with_zero(-459.67);
-pub static RANKINE: Base = Base::new("R", Temperature, 5.0 / 9.0);
+pub static DEG_CELSIUS: Base = Base::new("degC", Temperature, 1.0);
+pub static DEG_FAHRENHEIT: Base = Base::new("degF", Temperature, 5.0 / 9.0);
+pub static RANKINE: Base = Base::new("R", Temperature, 5.0 / 9.0).with_zero(0.0);
+pub static TEMP_CELSIUS: Base = Base::new("tempC", Temperature, 1.0).with_zero(-273.15);
+pub static TEMP_FAHRENHEIT: Base = Base::new("tempF", Temperature, 5.0 / 9.0).with_zero(-459.67);
 
 // More angles
 pub static DEGREE: Base = Base::new("deg", Angle, std::f64::consts::PI / 180.0);
 
 // Energy
-pub static JOULE: Lazy<Unit> = Lazy::new(|| Unit {
-    symbol: Some(String::from("J")),
-    numer: vec![&KILOGRAM, &METER, &METER],
-    denom: vec![&SECOND, &SECOND],
+pub static JOULE: Lazy<Unit> = Lazy::new(|| {
+    Unit::new(&[&KILOGRAM, &METER, &METER], &[&SECOND, &SECOND])
+        .unwrap()
+        .with_symbol("J")
 });
 
 // Force
-pub static NEWTON: Lazy<Unit> = Lazy::new(|| Unit {
-    symbol: Some(String::from("N")),
-    numer: vec![&KILOGRAM, &METER],
-    denom: vec![&SECOND, &SECOND],
+pub static NEWTON: Lazy<Unit> = Lazy::new(|| {
+    Unit::new(&[&KILOGRAM, &METER], &[&SECOND, &SECOND])
+        .unwrap()
+        .with_symbol("N")
 });
 
 // Power
-pub static WATT: Lazy<Unit> = Lazy::new(|| (&*JOULE / &SECOND).with_symbol("W"));
+pub static WATT: Lazy<Unit> = Lazy::new(|| (&*JOULE / &SECOND).unwrap().with_symbol("W"));

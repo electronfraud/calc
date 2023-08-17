@@ -169,11 +169,17 @@ This is a list of all available commands.
 
 The following units are supported.
 
-| Symbol | Description                         |
-| ------ | ----------------------------------- |
-| `kg`   | Kilogram. The SI base unit of mass. |
-| `m`    | Meter. The SI base unit of length.  |
-| `s`    | Second. The SI base unit of time.   |
+| Symbol  | Description                                                                 |
+| ------- | --------------------------------------------------------------------------- |
+| `degC`  | Degrees Celsius. This unit is an interval. For temperature, use `tempC`.    |
+| `degF`  | Degrees Fahrenheit. This unit is an interval. For temperature, use `tempF`. |
+| `K`     | Kelvin. The SI base unit of temperature.                                    |
+| `kg`    | Kilogram. The SI base unit of mass.                                         |
+| `m`     | Meter. The SI base unit of length.                                          |
+| `R`     | Rankine. Like Kelvin, but for Fahrenheit.                                   |
+| `s`     | Second. The SI base unit of time.                                           |
+| `tempC` | Temperature in degrees Celsius. For intervals, use `degC`.                  |
+| `tempF` | Temperature in degrees Fahrenheit. For intervals, use `degF`.               |
 
 ## About
 
@@ -200,9 +206,6 @@ with this program. If not, see <https://www.gnu.org/licenses/>.
 ### Future Work
 
 - Basics
-  - Temperature conversions are deltas, i.e., `32 degF degC into` is
-    approximately 17.8, not zero; `calc` should be able to perform
-    absolute conversions too
   - Integer bases (hexadecimal, binary, octal), base conversions, and
     bitwise operations
   - Exponent operator

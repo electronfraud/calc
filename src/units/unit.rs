@@ -24,10 +24,8 @@ use Error::*;
 pub struct Unit {
     /// Symbolic representation of the unit
     pub symbol: Option<String>,
-    #[doc(hidden)]
-    pub numer: Vec<&'static Base>,
-    #[doc(hidden)]
-    pub denom: Vec<&'static Base>,
+    numer: Vec<&'static Base>,
+    denom: Vec<&'static Base>,
 }
 
 impl Unit {
@@ -42,14 +40,36 @@ impl Unit {
     /// the magnitude of its exponent.
     ///
     /// If any of the base units cancel out, they are removed from the result.
-    #[must_use]
-    pub fn new(numer: &[&'static Base], denom: &[&'static Base]) -> Self {
-        Unit {
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if one of the base units has a non-zero zero point and:
+    /// - there is more than one base unit; or,
+    /// - the denominator is not empty.
+    pub fn new(numer: &[&'static Base], denom: &[&'static Base]) -> Result<Self, Error> {
+        let u = Unit {
             symbol: None,
             numer: Vec::from(numer),
             denom: Vec::from(denom),
         }
-        .simplified()
+        .simplified();
+
+        for base in &u.numer {
+            if base.zero.is_some()
+                && base.zero != Some(0.0)
+                && (u.numer.len() > 1 || !u.denom.is_empty())
+            {
+                return Err(NonzeroZeroPoint(base));
+            }
+        }
+
+        for base in &u.denom {
+            if base.zero.is_some() && base.zero != Some(0.0) {
+                return Err(NonzeroZeroPoint(base));
+            }
+        }
+
+        Ok(u)
     }
 
     /// Returns a new `Unit` identical to this one except that it has the given
@@ -63,14 +83,28 @@ impl Unit {
         }
     }
 
-    /// Converts a number in this unit to another unit, without adjusting for
-    /// differences in zero points. This function is only suitable for
-    /// converting intervals/deltas, not absolutes.
+    /// Return a vector of this unit's base units that have positive exponents.
+    /// The number of times a base unit appears in the vector indicates the
+    /// magnitude of its exponent.
+    #[must_use]
+    pub fn numer(&self) -> &Vec<&'static Base> {
+        &self.numer
+    }
+
+    /// Return a vector of this unit's base units that have negative exponents.
+    /// The number of times a base unit appears in the vector indicates the
+    /// magnitude of its exponent.
+    #[must_use]
+    pub fn denom(&self) -> &Vec<&'static Base> {
+        &self.denom
+    }
+
+    /// Converts a number in this unit to another unit.
     ///
     /// # Errors
     ///
     /// Returns an error if `self` can't be converted to `other`.
-    pub fn convert_interval(&self, num: f64, other: &Self) -> Result<f64, Error> {
+    pub fn convert(&self, num: f64, other: &Self) -> Result<f64, Error> {
         let mut num = num;
 
         if !self.is_commensurable_with(other) {
@@ -82,6 +116,9 @@ impl Unit {
 
         // Reduce to SI
         for base in &self.numer {
+            if let Some(z) = base.zero {
+                num -= z;
+            }
             num *= base.factor;
         }
         for base in &self.denom {
@@ -91,6 +128,9 @@ impl Unit {
         // Raise to new unit
         for base in &other.numer {
             num /= base.factor;
+            if let Some(z) = base.zero {
+                num += z;
+            }
         }
         for base in &other.denom {
             num *= base.factor;
@@ -99,49 +139,17 @@ impl Unit {
         Ok(num)
     }
 
-    /// Converts a number in this unit to another unit, adjusting for
-    /// differences in zero points.
+    /// Returns a unit with the same base units as this one, but with all of the
+    /// exponents multiplied by -1.
     ///
     /// # Errors
     ///
-    /// Returns an error if:
-    /// - `self` can't be converted to `other`; or
-    /// - the unit does not consist of a single base unit with an exponent of
-    ///   positive one.
-    pub fn convert_absolute(&self, num: f64, other: &Self) -> Result<f64, Error> {
-        let mut num = num;
-
-        if self.numer.len() + self.denom.len() > 1 {
-            return Err(TooManyBaseUnits(Box::new(self.clone())));
+    /// Returns an error if the unit has a zero point. Inversion of these units
+    /// is nonsensical.
+    pub fn inverse(&self) -> Result<Self, Error> {
+        if !self.numer.is_empty() && self.numer[0].zero == Some(0.0) {
+            return Err(UninvertableUnits(Box::new(self.clone())));
         }
-        if other.numer.len() + self.denom.len() > 1 {
-            return Err(TooManyBaseUnits(Box::new(other.clone())));
-        }
-        if !self.denom.is_empty() {
-            return Err(NegativeExponent(Box::new(self.clone())));
-        }
-        if !other.denom.is_empty() {
-            return Err(NegativeExponent(Box::new(other.clone())));
-        }
-
-        if !self.is_commensurable_with(other) {
-            return Err(IncommensurableUnits(
-                Some(Box::new(self.clone())),
-                Some(Box::new(other.clone())),
-            ));
-        }
-
-        num -= self.numer[0].zero;
-        num *= self.numer[0].factor;
-        num = num.mul_add(other.numer[0].factor.recip(), other.numer[0].zero);
-
-        Ok(num)
-    }
-
-    /// Returns a unit with the same base units as this one, but with all of the
-    /// exponents multiplied by -1.
-    #[must_use]
-    pub fn inverse(&self) -> Unit {
         Self::new(self.denom.as_slice(), self.numer.as_slice())
     }
 
@@ -172,11 +180,33 @@ impl Unit {
     /// Determines whether a quantity in this unit can be converted to another unit.
     #[must_use]
     pub fn is_commensurable_with(&self, other: &Unit) -> bool {
-        // If each physical sequence occurs the same number of times in this
-        // unit's numerator and the other unit's numerator, and the same is true
-        // of the denominators, then the units are commensurable.
-        Unit::physq_counts_match(&self.numer, &other.numer)
-            && Unit::physq_counts_match(&self.denom, &other.denom)
+        // If number of occurrences of each physical quantity in the numerators
+        // differs, then the units are incommensurable; likewise for the
+        // denominators.
+        if !(Unit::physq_counts_match(&self.numer, &other.numer)
+            && Unit::physq_counts_match(&self.denom, &other.denom))
+        {
+            return false;
+        }
+
+        // By contract we assume that any unit with a temperature base (z != 0)
+        // consists solely of that base, in the numerator. If that isn't the
+        // case with these units, there's nothing left to check.
+        if !(self.numer.len() == 1 && self.denom.is_empty()) {
+            return true;
+        }
+
+        let a = self.numer[0].zero;
+        let b = other.numer[0].zero;
+
+        // Conversion to or from Kelvin or Rankine is always allowed.
+        if a == Some(0.0) || b == Some(0.0) {
+            return true;
+        }
+
+        // Otherwise both units must have a zero, or both units must not have a
+        // zero.
+        (a.is_some() && b.is_some()) || (a.is_none() && b.is_none())
     }
 
     /// Returns a new `Unit` mathematically identical to this one but without
@@ -236,11 +266,11 @@ impl std::fmt::Display for Unit {
 }
 
 impl std::ops::Mul<Self> for &Unit {
-    type Output = Unit;
+    type Output = Result<Unit, Error>;
 
     /// Produces the unit that would result from multiplying a quantity in this
     /// unit with a quantity in another unit.
-    fn mul(self, other: &Unit) -> Unit {
+    fn mul(self, other: &Unit) -> Result<Unit, Error> {
         let mut numer = self.numer.clone();
         let mut denom = self.denom.clone();
         numer.extend(&other.numer);
@@ -250,21 +280,21 @@ impl std::ops::Mul<Self> for &Unit {
 }
 
 impl std::ops::Mul<&'static Base> for Unit {
-    type Output = Unit;
+    type Output = Result<Unit, Error>;
 
     /// Produces the unit that would result from multiplying a quantity in this
     /// unit with a quantity in a base unit.
-    fn mul(self, other: &'static Base) -> Unit {
+    fn mul(self, other: &'static Base) -> Result<Unit, Error> {
         &self * other
     }
 }
 
 impl std::ops::Mul<&'static Base> for &Unit {
-    type Output = Unit;
+    type Output = Result<Unit, Error>;
 
     /// Produces the unit that would result from multiplying a quantity in this
     /// unit with a quantity in a base unit.
-    fn mul(self, other: &'static Base) -> Unit {
+    fn mul(self, other: &'static Base) -> Result<Unit, Error> {
         let mut numer = self.numer.clone();
         numer.extend([other]);
         Unit::new(numer.as_slice(), self.denom.as_slice())
@@ -272,11 +302,11 @@ impl std::ops::Mul<&'static Base> for &Unit {
 }
 
 impl std::ops::Div<Self> for &Unit {
-    type Output = Unit;
+    type Output = Result<Unit, Error>;
 
     /// Produces the unit that would result from dividing a quantity in this
     /// unit by a quantity in another unit.
-    fn div(self, other: &Unit) -> Unit {
+    fn div(self, other: &Unit) -> Result<Unit, Error> {
         let mut numer = self.numer.clone();
         let mut denom = self.denom.clone();
         numer.extend(&other.denom);
@@ -286,21 +316,21 @@ impl std::ops::Div<Self> for &Unit {
 }
 
 impl std::ops::Div<&'static Base> for Unit {
-    type Output = Unit;
+    type Output = Result<Unit, Error>;
 
     /// Produces the unit that would result from dividing a quantity in this
     /// unit by a quantity in a base unit.
-    fn div(self, other: &'static Base) -> Unit {
+    fn div(self, other: &'static Base) -> Result<Unit, Error> {
         &self / other
     }
 }
 
 impl std::ops::Div<&'static Base> for &Unit {
-    type Output = Unit;
+    type Output = Result<Unit, Error>;
 
     /// Produces the unit that would result from dividing a quantity in this
     /// unit by a quantity in a base unit.
-    fn div(self, other: &'static Base) -> Unit {
+    fn div(self, other: &'static Base) -> Result<Unit, Error> {
         let mut denom = self.denom.clone();
         denom.extend([other]);
         Unit::new(self.numer.as_slice(), denom.as_slice())
@@ -310,13 +340,15 @@ impl std::ops::Div<&'static Base> for &Unit {
 #[cfg(test)]
 mod tests {
     use crate::units::{
-        Unit, AMPERE, CELSIUS, FAHRENHEIT, FOOT, HOUR, KILOGRAM, METER, MILE, NAUTICAL_MILE, SECOND,
+        Unit, AMPERE, DEG_CELSIUS, DEG_FAHRENHEIT, FOOT, HOUR, KELVIN, KILOGRAM, METER, MILE,
+        NAUTICAL_MILE, RANKINE, SECOND, TEMP_CELSIUS, TEMP_FAHRENHEIT,
     };
     use approx::assert_relative_eq;
 
     #[test]
     fn unit_display() {
-        let m_kg_per_ampere_s = &METER * &KILOGRAM / &AMPERE / &SECOND;
+        let m_kg_per_ampere_s =
+            (((&METER * &KILOGRAM).unwrap() / &AMPERE).unwrap() / &SECOND).unwrap();
         assert_eq!(m_kg_per_ampere_s.to_string(), "m⋅kg⋅A⁻¹⋅s⁻¹");
 
         let joule = Unit {
@@ -329,95 +361,220 @@ mod tests {
 
     #[test]
     fn unit_multiplied_by_unit() {
-        let m_per_s = &METER / &SECOND;
-        let kg_per_amp = &KILOGRAM / &AMPERE;
-        let result = &m_per_s * &kg_per_amp;
+        let m_per_s = (&METER / &SECOND).unwrap();
+        let kg_per_amp = (&KILOGRAM / &AMPERE).unwrap();
+        let result = (&m_per_s * &kg_per_amp).unwrap();
         assert_eq!(result.numer, vec![&METER, &KILOGRAM]);
         assert_eq!(result.denom, vec![&SECOND, &AMPERE]);
     }
 
     #[test]
     fn unit_multiplied_by_base() {
-        let m_per_s = &METER / &SECOND;
-        let result = m_per_s * &KILOGRAM;
+        let m_per_s = (&METER / &SECOND).unwrap();
+        let result = (m_per_s * &KILOGRAM).unwrap();
         assert_eq!(result.numer, vec![&METER, &KILOGRAM]);
         assert_eq!(result.denom, vec![&SECOND]);
     }
 
     #[test]
     fn unit_divided_by_unit() {
-        let m_per_s = &METER / &SECOND;
-        let kg_per_amp = &KILOGRAM / &AMPERE;
-        let result = &m_per_s / &kg_per_amp;
+        let m_per_s = (&METER / &SECOND).unwrap();
+        let kg_per_amp = (&KILOGRAM / &AMPERE).unwrap();
+        let result = (&m_per_s / &kg_per_amp).unwrap();
         assert_eq!(result.numer, vec![&METER, &AMPERE]);
         assert_eq!(result.denom, vec![&SECOND, &KILOGRAM]);
     }
 
     #[test]
     fn unit_divided_by_base() {
-        let m_per_s = &METER / &SECOND;
-        let result = m_per_s / &KILOGRAM;
+        let m_per_s = (&METER / &SECOND).unwrap();
+        let result = (m_per_s / &KILOGRAM).unwrap();
         assert_eq!(result.numer, vec![&METER]);
         assert_eq!(result.denom, vec![&SECOND, &KILOGRAM]);
     }
 
     #[test]
     fn unit_simplification() {
-        let kg_per_s = &SECOND * &METER * &KILOGRAM / &METER / &SECOND / &SECOND;
+        let kg_per_s = (((((&SECOND * &METER).unwrap() * &KILOGRAM).unwrap() / &METER).unwrap()
+            / &SECOND)
+            .unwrap()
+            / &SECOND)
+            .unwrap();
         assert_eq!(kg_per_s.numer, vec![&KILOGRAM]);
         assert_eq!(kg_per_s.denom, vec![&SECOND]);
     }
 
     #[test]
-    fn interval_unit_conversion() {
-        let m = Unit::new(&[&METER], &[]);
-        let ft = Unit::new(&[&FOOT], &[]);
-        assert_eq!(m.convert_interval(7.0, &ft).unwrap(), 7.0 / 0.3048);
+    fn unit_conversion() {
+        let m = Unit::new(&[&METER], &[]).unwrap();
+        let ft = Unit::new(&[&FOOT], &[]).unwrap();
+        assert_eq!(m.convert(7.0, &ft).unwrap(), 7.0 / 0.3048);
 
-        let mph = Unit::new(&[&MILE], &[&HOUR]);
-        let kts = Unit::new(&[&NAUTICAL_MILE], &[&HOUR]);
-        assert_eq!(
-            mph.convert_interval(110.0, &kts).unwrap(),
-            110.0 * 1609.344 / 1852.0
+        let mph = Unit::new(&[&MILE], &[&HOUR]).unwrap();
+        let kts = Unit::new(&[&NAUTICAL_MILE], &[&HOUR]).unwrap();
+        assert_eq!(mph.convert(110.0, &kts).unwrap(), 110.0 * 1609.344 / 1852.0);
+
+        let m_per_s = Unit::new(&[&METER], &[&SECOND]).unwrap();
+        let hz = Unit::new(&[], &[&SECOND]).unwrap();
+        assert!(m_per_s.convert(1.0, &hz).is_err());
+    }
+
+    //     Acceptable temperature conversions
+    // ------------------------------------------
+    //                     TO
+    //          tempC tempF  degC  degF   K     R
+    //    tempC   o     o     x     x     o     o
+    // F  tempF   o     o     x     x     o     o
+    // R   degC   x     x     o     o     o     o
+    // O   degF   x     x     o     o     o     o
+    // M      K   o     o     o     o     o     o
+    //        R   o     o     o     o     o     o
+
+    #[test]
+    fn temp_celsius_conversions() {
+        let a = Unit::new(&[&TEMP_CELSIUS], &[]).unwrap();
+        let b = Unit::new(&[&TEMP_CELSIUS], &[]).unwrap();
+        assert_eq!(a.convert(1.0, &b).unwrap(), 1.0);
+        let a = Unit::new(&[&TEMP_CELSIUS], &[]).unwrap();
+        let b = Unit::new(&[&TEMP_FAHRENHEIT], &[]).unwrap();
+        assert_relative_eq!(
+            a.convert(1.0, &b).unwrap(),
+            33.8,
+            epsilon = f64::EPSILON * 448.0
         );
-
-        let m_per_s = Unit::new(&[&METER], &[&SECOND]);
-        let hz = Unit::new(&[], &[&SECOND]);
-        assert!(m_per_s.convert_interval(1.0, &hz).is_err());
-
-        let c = Unit::new(&[&CELSIUS], &[]);
-        let f = Unit::new(&[&FAHRENHEIT], &[]);
-        assert_relative_eq!(c.convert_interval(1.0, &f).unwrap(), 9.0 / 5.0);
-
-        let c = Unit::new(&[], &[&CELSIUS]);
-        let f = Unit::new(&[], &[&FAHRENHEIT]);
-        assert_relative_eq!(c.convert_interval(1.0, &f).unwrap(), 5.0 / 9.0);
+        let a = Unit::new(&[&TEMP_CELSIUS], &[]).unwrap();
+        let b = Unit::new(&[&DEG_CELSIUS], &[]).unwrap();
+        assert!(a.convert(1.0, &b).is_err());
+        let a = Unit::new(&[&TEMP_CELSIUS], &[]).unwrap();
+        let b = Unit::new(&[&DEG_FAHRENHEIT], &[]).unwrap();
+        assert!(a.convert(1.0, &b).is_err());
+        let a = Unit::new(&[&TEMP_CELSIUS], &[]).unwrap();
+        let b = Unit::new(&[&KELVIN], &[]).unwrap();
+        assert_eq!(a.convert(1.0, &b).unwrap(), 274.15);
+        let a = Unit::new(&[&TEMP_CELSIUS], &[]).unwrap();
+        let b = Unit::new(&[&RANKINE], &[]).unwrap();
+        assert_relative_eq!(
+            a.convert(1.0, &b).unwrap(),
+            493.47,
+            epsilon = f64::EPSILON * 512.0
+        );
     }
 
     #[test]
-    fn absolute_unit_conversion() {
-        let m = Unit::new(&[&METER], &[]);
-        let ft = Unit::new(&[&FOOT], &[]);
-        assert_eq!(m.convert_absolute(7.0, &ft).unwrap(), 7.0 / 0.3048);
-
-        let mph = Unit::new(&[&MILE], &[&HOUR]);
-        let kts = Unit::new(&[&NAUTICAL_MILE], &[&HOUR]);
-        assert!(mph.convert_absolute(110.0, &kts).is_err());
-
-        let m_per_s = Unit::new(&[&METER], &[&SECOND]);
-        let hz = Unit::new(&[], &[&SECOND]);
-        assert!(m_per_s.convert_absolute(1.0, &hz).is_err());
-
-        let c = Unit::new(&[&CELSIUS], &[]);
-        let f = Unit::new(&[&FAHRENHEIT], &[]);
+    fn temp_fahrenheit_conversions() {
+        let a = Unit::new(&[&TEMP_FAHRENHEIT], &[]).unwrap();
+        let b = Unit::new(&[&TEMP_CELSIUS], &[]).unwrap();
         assert_relative_eq!(
-            c.convert_absolute(1.0, &f).unwrap(),
-            33.8,
-            epsilon = f64::EPSILON * 448.0
-        ); // 9.947598300641403e-14
+            a.convert(1.0, &b).unwrap(),
+            (1.0 - 32.0) * 5.0 / 9.0,
+            epsilon = f64::EPSILON * 224.0
+        );
+        let a = Unit::new(&[&TEMP_FAHRENHEIT], &[]).unwrap();
+        let b = Unit::new(&[&TEMP_FAHRENHEIT], &[]).unwrap();
+        assert_eq!(a.convert(1.0, &b).unwrap(), 1.0);
+        let a = Unit::new(&[&TEMP_FAHRENHEIT], &[]).unwrap();
+        let b = Unit::new(&[&DEG_CELSIUS], &[]).unwrap();
+        assert!(a.convert(1.0, &b).is_err());
+        let a = Unit::new(&[&TEMP_FAHRENHEIT], &[]).unwrap();
+        let b = Unit::new(&[&DEG_FAHRENHEIT], &[]).unwrap();
+        assert!(a.convert(1.0, &b).is_err());
+        let a = Unit::new(&[&TEMP_FAHRENHEIT], &[]).unwrap();
+        let b = Unit::new(&[&KELVIN], &[]).unwrap();
+        assert_relative_eq!(
+            a.convert(1.0, &b).unwrap(),
+            273.15 + (1.0 - 32.0) * 5.0 / 9.0,
+            epsilon = f64::EPSILON * 256.0
+        );
+        let a = Unit::new(&[&TEMP_FAHRENHEIT], &[]).unwrap();
+        let b = Unit::new(&[&RANKINE], &[]).unwrap();
+        assert_eq!(a.convert(1.0, &b).unwrap(), 460.67);
+    }
 
-        let c = Unit::new(&[], &[&CELSIUS]);
-        let f = Unit::new(&[], &[&FAHRENHEIT]);
-        assert!(c.convert_absolute(1.0, &f).is_err());
+    #[test]
+    fn deg_celsius_conversions() {
+        let a = Unit::new(&[&DEG_CELSIUS], &[]).unwrap();
+        let b = Unit::new(&[&TEMP_CELSIUS], &[]).unwrap();
+        assert!(a.convert(1.0, &b).is_err());
+        let a = Unit::new(&[&DEG_CELSIUS], &[]).unwrap();
+        let b = Unit::new(&[&TEMP_FAHRENHEIT], &[]).unwrap();
+        assert!(a.convert(1.0, &b).is_err());
+        let a = Unit::new(&[&DEG_CELSIUS], &[]).unwrap();
+        let b = Unit::new(&[&DEG_CELSIUS], &[]).unwrap();
+        assert_eq!(a.convert(1.0, &b).unwrap(), 1.0);
+        let a = Unit::new(&[&DEG_CELSIUS], &[]).unwrap();
+        let b = Unit::new(&[&DEG_FAHRENHEIT], &[]).unwrap();
+        assert_relative_eq!(a.convert(1.0, &b).unwrap(), 1.8);
+        let a = Unit::new(&[&DEG_CELSIUS], &[]).unwrap();
+        let b = Unit::new(&[&KELVIN], &[]).unwrap();
+        assert_eq!(a.convert(1.0, &b).unwrap(), 1.0);
+        let a = Unit::new(&[&DEG_CELSIUS], &[]).unwrap();
+        let b = Unit::new(&[&RANKINE], &[]).unwrap();
+        assert_relative_eq!(a.convert(1.0, &b).unwrap(), 1.8);
+    }
+
+    #[test]
+    fn deg_fahrenheit_conversions() {
+        let a = Unit::new(&[&DEG_FAHRENHEIT], &[]).unwrap();
+        let b = Unit::new(&[&TEMP_CELSIUS], &[]).unwrap();
+        assert!(a.convert(1.0, &b).is_err());
+        let a = Unit::new(&[&DEG_FAHRENHEIT], &[]).unwrap();
+        let b = Unit::new(&[&TEMP_FAHRENHEIT], &[]).unwrap();
+        assert!(a.convert(1.0, &b).is_err());
+        let a = Unit::new(&[&DEG_FAHRENHEIT], &[]).unwrap();
+        let b = Unit::new(&[&DEG_CELSIUS], &[]).unwrap();
+        assert_eq!(a.convert(1.0, &b).unwrap(), 5.0 / 9.0);
+        let a = Unit::new(&[&DEG_FAHRENHEIT], &[]).unwrap();
+        let b = Unit::new(&[&DEG_FAHRENHEIT], &[]).unwrap();
+        assert_eq!(a.convert(1.0, &b).unwrap(), 1.0);
+        let a = Unit::new(&[&DEG_FAHRENHEIT], &[]).unwrap();
+        let b = Unit::new(&[&KELVIN], &[]).unwrap();
+        assert_eq!(a.convert(1.0, &b).unwrap(), 5.0 / 9.0);
+        let a = Unit::new(&[&DEG_FAHRENHEIT], &[]).unwrap();
+        let b = Unit::new(&[&RANKINE], &[]).unwrap();
+        assert_eq!(a.convert(1.0, &b).unwrap(), 1.0);
+    }
+
+    #[test]
+    fn kelvin_conversions() {
+        let a = Unit::new(&[&KELVIN], &[]).unwrap();
+        let b = Unit::new(&[&TEMP_CELSIUS], &[]).unwrap();
+        assert_eq!(a.convert(1.0, &b).unwrap(), -272.15);
+        let a = Unit::new(&[&KELVIN], &[]).unwrap();
+        let b = Unit::new(&[&TEMP_FAHRENHEIT], &[]).unwrap();
+        assert_eq!(a.convert(1.0, &b).unwrap(), -457.87);
+        let a = Unit::new(&[&KELVIN], &[]).unwrap();
+        let b = Unit::new(&[&DEG_CELSIUS], &[]).unwrap();
+        assert_eq!(a.convert(1.0, &b).unwrap(), 1.0);
+        let a = Unit::new(&[&KELVIN], &[]).unwrap();
+        let b = Unit::new(&[&DEG_FAHRENHEIT], &[]).unwrap();
+        assert_relative_eq!(a.convert(1.0, &b).unwrap(), 1.8);
+        let a = Unit::new(&[&KELVIN], &[]).unwrap();
+        let b = Unit::new(&[&KELVIN], &[]).unwrap();
+        assert_eq!(a.convert(1.0, &b).unwrap(), 1.0);
+        let a = Unit::new(&[&KELVIN], &[]).unwrap();
+        let b = Unit::new(&[&RANKINE], &[]).unwrap();
+        assert_relative_eq!(a.convert(1.0, &b).unwrap(), 1.8);
+    }
+
+    #[test]
+    fn deg_rankine_conversions() {
+        let a = Unit::new(&[&RANKINE], &[]).unwrap();
+        let b = Unit::new(&[&TEMP_CELSIUS], &[]).unwrap();
+        assert_eq!(a.convert(1.0, &b).unwrap(), -273.15 + 5.0 / 9.0);
+        let a = Unit::new(&[&RANKINE], &[]).unwrap();
+        let b = Unit::new(&[&TEMP_FAHRENHEIT], &[]).unwrap();
+        assert_eq!(a.convert(1.0, &b).unwrap(), -458.67);
+        let a = Unit::new(&[&RANKINE], &[]).unwrap();
+        let b = Unit::new(&[&DEG_CELSIUS], &[]).unwrap();
+        assert_eq!(a.convert(1.0, &b).unwrap(), 5.0 / 9.0);
+        let a = Unit::new(&[&RANKINE], &[]).unwrap();
+        let b = Unit::new(&[&DEG_FAHRENHEIT], &[]).unwrap();
+        assert_eq!(a.convert(1.0, &b).unwrap(), 1.0);
+        let a = Unit::new(&[&RANKINE], &[]).unwrap();
+        let b = Unit::new(&[&KELVIN], &[]).unwrap();
+        assert_eq!(a.convert(1.0, &b).unwrap(), 5.0 / 9.0);
+        let a = Unit::new(&[&RANKINE], &[]).unwrap();
+        let b = Unit::new(&[&RANKINE], &[]).unwrap();
+        assert_eq!(a.convert(1.0, &b).unwrap(), 1.0);
     }
 }

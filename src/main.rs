@@ -85,12 +85,10 @@ fn eval_word(w: &str, stack: &mut Stack, builtins: &HashMap<&'static str, Builti
                 },
                 calc::builtins::Error::Units(e) => match e {
                     units::Error::IncommensurableUnits(_, _) => println!("incommensurable units"),
-                    units::Error::TooManyBaseUnits(_) => {
-                        println!("can't perform absolute conversion of a derived unit");
+                    units::Error::UninvertableUnits(u) => println!("{u} can't be inverted"),
+                    units::Error::NonzeroZeroPoint(b) => {
+                        println!("operation would place {b} in a nonsensical position");
                     }
-                    units::Error::NegativeExponent(_) => println!(
-                        "can't perform absolute conversion of a unit with a negative exponent"
-                    ),
                 },
             };
             return false;

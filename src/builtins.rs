@@ -114,8 +114,11 @@ pub fn builtin_mul(stack: &mut Stack) -> Result<(), Error> {
     // Two numbers
     match pop2!(stack, stack::Item::Number, stack::Item::Number) {
         Ok((a, b)) => {
-            stack.push_number(&a * &b);
-            return Ok(());
+            return (&a * &b).map(|c| stack.push_number(c)).map_err(|e| {
+                stack.push_number(a);
+                stack.push_number(b);
+                Error::Units(e)
+            })
         }
         Err(stack::Error::TypeMismatch) => { /* do nothing */ }
         Err(e) => return Err(Error::Stack(e)),
@@ -124,8 +127,11 @@ pub fn builtin_mul(stack: &mut Stack) -> Result<(), Error> {
     // Two units
     match pop2!(stack, stack::Item::Unit, stack::Item::Unit) {
         Ok((u1, u2)) => {
-            stack.push_unit(&u1 * &u2);
-            return Ok(());
+            return (&u1 * &u2).map(|u| stack.push_unit(u)).map_err(|e| {
+                stack.push_unit(u1);
+                stack.push_unit(u2);
+                Error::Units(e)
+            })
         }
         Err(stack::Error::TypeMismatch) => { /* do nothing */ }
         Err(e) => return Err(Error::Stack(e)),
@@ -133,10 +139,11 @@ pub fn builtin_mul(stack: &mut Stack) -> Result<(), Error> {
 
     // `a` is a number and `b` is a unit
     match pop2!(stack, stack::Item::Number, stack::Item::Unit) {
-        Ok((n, u)) => {
-            stack.push_number(&n * &u);
-            Ok(())
-        }
+        Ok((n, u)) => (&n * &u).map(|nu| stack.push_number(nu)).map_err(|e| {
+            stack.push_number(n);
+            stack.push_unit(u);
+            Error::Units(e)
+        }),
         Err(e) => Err(Error::Stack(e)),
     }
 }
@@ -156,16 +163,20 @@ pub fn builtin_mul(stack: &mut Stack) -> Result<(), Error> {
 /// An error occurs if:
 /// - there are fewer than two items on the stack;
 /// - the items are not two numbers;
-/// - the items are not two units; or,
-/// - the items are not a number `a` and a unit `b`.
+/// - the items are not two units;
+/// - the items are not a number `a` and a unit `b`;
+/// - the division would result in a nonsensical temperature unit.
 ///
 /// If there is an error, the stack is unchanged; the operands are not popped.
 pub fn builtin_div(stack: &mut Stack) -> Result<(), Error> {
     // Two numbers
     match pop2!(stack, stack::Item::Number, stack::Item::Number) {
         Ok((a, b)) => {
-            stack.push_number(&a / &b);
-            return Ok(());
+            return (&a / &b).map(|c| stack.push_number(c)).map_err(|e| {
+                stack.push_number(a);
+                stack.push_number(b);
+                Error::Units(e)
+            })
         }
         Err(stack::Error::TypeMismatch) => { /* do nothing */ }
         Err(e) => return Err(Error::Stack(e)),
@@ -174,8 +185,11 @@ pub fn builtin_div(stack: &mut Stack) -> Result<(), Error> {
     // Two units
     match pop2!(stack, stack::Item::Unit, stack::Item::Unit) {
         Ok((u1, u2)) => {
-            stack.push_unit(&u1 / &u2);
-            return Ok(());
+            return (&u1 / &u2).map(|u| stack.push_unit(u)).map_err(|e| {
+                stack.push_unit(u1);
+                stack.push_unit(u2);
+                Error::Units(e)
+            })
         }
         Err(stack::Error::TypeMismatch) => { /* do nothing */ }
         Err(e) => return Err(Error::Stack(e)),
@@ -183,10 +197,11 @@ pub fn builtin_div(stack: &mut Stack) -> Result<(), Error> {
 
     // `a` is a number and `b` is a unit
     match pop2!(stack, stack::Item::Number, stack::Item::Unit) {
-        Ok((n, u)) => {
-            stack.push_number(&n / &u);
-            Ok(())
-        }
+        Ok((n, u)) => (&n / &u).map(|nu| stack.push_number(nu)).map_err(|e| {
+            stack.push_number(n);
+            stack.push_unit(u);
+            Error::Units(e)
+        }),
         Err(e) => Err(Error::Stack(e)),
     }
 }
@@ -228,7 +243,7 @@ pub fn builtin_into(stack: &mut Stack) -> Result<(), Error> {
     match pop2!(stack, stack::Item::Number, stack::Item::Unit) {
         Ok((n, u)) => {
             if let Some(n_unit) = n.unit.as_ref() {
-                match n_unit.convert_interval(n.value, &u) {
+                match n_unit.convert(n.value, &u) {
                     Ok(value) => {
                         stack.push_number(Number::new(value).with_unit(u));
                         Ok(())
@@ -297,7 +312,7 @@ pub fn builtin_unit(u: &Unit, stack: &mut Stack) {
 /// Creates a `Builtin` for a `Base`.
 macro_rules! base {
     ($b:expr) => {
-        ($b.symbol, anonunit!(&Unit::new(&[&$b], &[])))
+        ($b.symbol, anonunit!(&Unit::new(&[&$b], &[]).unwrap()))
     };
 }
 
@@ -329,6 +344,7 @@ macro_rules! constant {
 }
 
 /// Returns a table of builtin names and the functions that implement them.
+#[allow(clippy::missing_panics_doc)]
 #[must_use]
 pub fn table() -> HashMap<&'static str, Builtin> {
     HashMap::from([
@@ -340,16 +356,21 @@ pub fn table() -> HashMap<&'static str, Builtin> {
         // Constants
         (
             "c",
-            constant!(Number::new(299_792_458.0).with_unit(&units::METER / &units::SECOND)),
+            constant!(
+                Number::new(299_792_458.0).with_unit((&units::METER / &units::SECOND).unwrap())
+            ),
         ),
         ("e", constant!(Number::new(std::f64::consts::E))),
         (
             "h",
-            constant!(Number::new(6.626_070_15e-34).with_unit(&*units::JOULE * &units::SECOND)),
+            constant!(
+                Number::new(6.626_070_15e-34).with_unit((&*units::JOULE * &units::SECOND).unwrap())
+            ),
         ),
         (
             "hbar",
-            constant!(Number::new(1.054_571_817e-34).with_unit(&*units::JOULE * &units::SECOND)),
+            constant!(Number::new(1.054_571_817e-34)
+                .with_unit((&*units::JOULE * &units::SECOND).unwrap())),
         ),
         ("pi", constant!(Number::new(std::f64::consts::PI))),
         // Stack
@@ -372,9 +393,11 @@ pub fn table() -> HashMap<&'static str, Builtin> {
         base!(units::FOOT),
         base!(units::MILE),
         base!(units::NAUTICAL_MILE),
-        base!(units::CELSIUS),
-        base!(units::FAHRENHEIT),
+        base!(units::DEG_CELSIUS),
+        base!(units::DEG_FAHRENHEIT),
         base!(units::RANKINE),
+        base!(units::TEMP_CELSIUS),
+        base!(units::TEMP_FAHRENHEIT),
         base!(units::DEGREE),
         base!(units::INCH),
         base!(units::MILLIMETER),

@@ -90,7 +90,7 @@ impl std::ops::Add<&Number> for &Number {
 
         match (&self.unit, &other.unit) {
             (Some(u1), Some(u2)) => u2
-                .convert_interval(v2, u1)
+                .convert(v2, u1)
                 .map(|v2| Number::new(v1 + v2).with_unit(u1.clone())),
             (None, None) => Ok(Number::new(v1 + v2)),
             (Some(u1), None) => Err(Error::IncommensurableUnits(
@@ -119,7 +119,7 @@ impl std::ops::Sub<&Number> for &Number {
 
         match (&self.unit, &other.unit) {
             (Some(u1), Some(u2)) => u2
-                .convert_interval(v2, u1)
+                .convert(v2, u1)
                 .map(|v2| Number::new(v1 - v2).with_unit(u1.clone())),
             (None, None) => Ok(Number::new(v1 - v2)),
             (Some(u1), None) => Err(Error::IncommensurableUnits(
@@ -135,55 +135,61 @@ impl std::ops::Sub<&Number> for &Number {
 }
 
 impl std::ops::Mul<&Number> for &Number {
-    type Output = Number;
+    type Output = Result<Number, Error>;
 
     /// Multiplies this number by another.
-    fn mul(self, other: &Number) -> Number {
+    fn mul(self, other: &Number) -> Result<Number, Error> {
         let v1 = self.value;
         let v2 = other.value;
 
         match (&self.unit, &other.unit) {
-            (Some(u1), Some(u2)) => Number::new(v1 * v2).with_unit(u1 * u2),
-            (Some(u), None) | (None, Some(u)) => Number::new(v1 * v2).with_unit(u.clone()),
-            (None, None) => Number::new(v1 * v2),
+            (Some(u1), Some(u2)) => (u1 * u2).map(|u| Number::new(v1 * v2).with_unit(u)),
+            (Some(u), None) | (None, Some(u)) => Ok(Number::new(v1 * v2).with_unit(u.clone())),
+            (None, None) => Ok(Number::new(v1 * v2)),
         }
     }
 }
 
 impl std::ops::Mul<&Unit> for &Number {
-    type Output = Number;
+    type Output = Result<Number, Error>;
 
     /// Multiplies this number's unit by another unit. If the number has no
     /// unit, assigns the unit to the number.
-    fn mul(self, other: &Unit) -> Number {
-        self.with_unit(self.unit.as_ref().map_or(other.clone(), |u| u * other))
+    fn mul(self, other: &Unit) -> Result<Number, Error> {
+        self.unit
+            .as_ref()
+            .map_or(Ok(other.clone()), |u| u * other)
+            .map(|u| self.with_unit(u))
     }
 }
 
 impl std::ops::Div<&Number> for &Number {
-    type Output = Number;
+    type Output = Result<Number, Error>;
 
     /// Divides this number by another.
-    fn div(self, other: &Number) -> Number {
+    fn div(self, other: &Number) -> Result<Number, Error> {
         let v1 = self.value;
         let v2 = other.value;
 
         match (&self.unit, &other.unit) {
-            (Some(u1), Some(u2)) => Number::new(v1 / v2).with_unit(u1 / u2),
-            (Some(u1), None) => Number::new(v1 / v2).with_unit(u1.clone()),
-            (None, Some(u2)) => Number::new(v1 / v2).with_unit(u2.inverse()),
-            (None, None) => Number::new(v1 / v2),
+            (Some(u1), Some(u2)) => (u1 / u2).map(|u| Number::new(v1 / v2).with_unit(u)),
+            (Some(u1), None) => Ok(Number::new(v1 / v2).with_unit(u1.clone())),
+            (None, Some(u2)) => u2.inverse().map(|u| Number::new(v1 / v2).with_unit(u)),
+            (None, None) => Ok(Number::new(v1 / v2)),
         }
     }
 }
 
 impl std::ops::Div<&Unit> for &Number {
-    type Output = Number;
+    type Output = Result<Number, Error>;
 
     /// Divides this number's unit by another unit. If the number has no unit,
     /// assigns the inverse of the unit to the number.
-    fn div(self, other: &Unit) -> Number {
-        self.with_unit(self.unit.as_ref().map_or(other.inverse(), |u| u / other))
+    fn div(self, other: &Unit) -> Result<Number, Error> {
+        self.unit
+            .as_ref()
+            .map_or(other.inverse(), |u| u / other)
+            .map(|u| self.with_unit(u))
     }
 }
 
@@ -201,62 +207,65 @@ mod tests {
 
     #[test]
     fn dimensionless_added_to_unit() {
-        let result = &Number::new(5.0) + &Number::new(10.0).with_unit(&METER / &SECOND);
+        let result = &Number::new(5.0) + &Number::new(10.0).with_unit((&METER / &SECOND).unwrap());
         assert!(result.is_err());
     }
 
     #[test]
     fn unit_added_to_dimensionless() {
-        let result = &Number::new(10.0).with_unit(&METER / &SECOND) + &Number::new(5.0);
+        let result = &Number::new(10.0).with_unit((&METER / &SECOND).unwrap()) + &Number::new(5.0);
         assert!(result.is_err());
     }
 
     #[test]
     fn unit_added_to_compatible_unit() {
-        let x = (&Number::new(10.0).with_unit(&METER / &SECOND)
-            + &Number::new(5.0).with_unit(&MILE / &HOUR))
+        let x = (&Number::new(10.0).with_unit((&METER / &SECOND).unwrap())
+            + &Number::new(5.0).with_unit((&MILE / &HOUR).unwrap()))
             .unwrap();
         assert_eq!(x.value, 12.235199999999999);
-        assert_eq!(x.unit.as_ref().unwrap().numer, vec![&METER]);
-        assert_eq!(x.unit.unwrap().denom, vec![&SECOND]);
+        assert_eq!(*x.unit.as_ref().unwrap().numer(), vec![&METER]);
+        assert_eq!(*x.unit.unwrap().denom(), vec![&SECOND]);
     }
 
     #[test]
     fn unit_added_to_incompatible_unit() {
-        let result = &Number::new(10.0).with_unit(&METER / &SECOND)
-            + &Number::new(5.0).with_unit(&MILE / &KILOGRAM);
+        let result = &Number::new(10.0).with_unit((&METER / &SECOND).unwrap())
+            + &Number::new(5.0).with_unit((&MILE / &KILOGRAM).unwrap());
         assert!(result.is_err());
     }
 
     #[test]
     fn dimensionless_multiplied_by_dimensionless() {
-        let x = &Number::new(5.0) * &Number::new(10.0);
+        let x = (&Number::new(5.0) * &Number::new(10.0)).unwrap();
         assert_eq!(x.value, 50.0);
         assert!(x.is_dimensionless());
     }
 
     #[test]
     fn dimensionless_multiplied_by_unit() {
-        let x = &Number::new(5.0) * &Number::new(10.0).with_unit(&METER / &SECOND);
+        let x = (&Number::new(5.0) * &Number::new(10.0).with_unit((&METER / &SECOND).unwrap()))
+            .unwrap();
         assert_eq!(x.value, 50.0);
-        assert_eq!(x.unit.as_ref().unwrap().numer, vec![&METER]);
-        assert_eq!(x.unit.unwrap().denom, vec![&SECOND]);
+        assert_eq!(*x.unit.as_ref().unwrap().numer(), vec![&METER]);
+        assert_eq!(*x.unit.unwrap().denom(), vec![&SECOND]);
     }
 
     #[test]
     fn unit_multiplied_by_dimensionless() {
-        let x = &Number::new(5.0).with_unit(&METER / &SECOND) * &Number::new(10.0);
+        let x = (&Number::new(5.0).with_unit((&METER / &SECOND).unwrap()) * &Number::new(10.0))
+            .unwrap();
         assert_eq!(x.value, 50.0);
-        assert_eq!(x.unit.as_ref().unwrap().numer, vec![&METER]);
-        assert_eq!(x.unit.unwrap().denom, vec![&SECOND]);
+        assert_eq!(*x.unit.as_ref().unwrap().numer(), vec![&METER]);
+        assert_eq!(*x.unit.unwrap().denom(), vec![&SECOND]);
     }
 
     #[test]
     fn unit_multiplied_by_unit() {
-        let x = &Number::new(5.0).with_unit(&METER / &SECOND)
-            * &Number::new(10.0).with_unit(&MILE / &HOUR);
+        let x = (&Number::new(5.0).with_unit((&METER / &SECOND).unwrap())
+            * &Number::new(10.0).with_unit((&MILE / &HOUR).unwrap()))
+            .unwrap();
         assert_eq!(x.value, 50.0);
-        assert_eq!(x.unit.as_ref().unwrap().numer, vec![&METER, &MILE]);
-        assert_eq!(x.unit.unwrap().denom, vec![&SECOND, &HOUR]);
+        assert_eq!(*x.unit.as_ref().unwrap().numer(), vec![&METER, &MILE]);
+        assert_eq!(*x.unit.unwrap().denom(), vec![&SECOND, &HOUR]);
     }
 }

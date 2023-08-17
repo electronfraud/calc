@@ -246,7 +246,7 @@ mod tests {
     #[test]
     fn pop_type_mismatch() {
         let mut s = Stack::new();
-        s.push_unit(&units::METER / &units::SECOND);
+        s.push_unit((&units::METER / &units::SECOND).unwrap());
         let h = s.height();
         assert_eq!(pop!(s, Item::Number).unwrap_err(), Error::TypeMismatch);
         assert_eq!(s.height(), h);
@@ -269,7 +269,7 @@ mod tests {
             Error::Underflow
         );
 
-        s.push_unit(&units::METER / &units::SECOND);
+        s.push_unit((&units::METER / &units::SECOND).unwrap());
         let h = s.height();
         assert_eq!(
             pop2!(s, Item::Number, Item::Number).unwrap_err(),
@@ -282,8 +282,8 @@ mod tests {
     fn pop2_type_mismatch() {
         let mut s = Stack::new();
 
-        s.push_unit(&units::METER / &units::SECOND);
-        s.push_unit(&units::METER / &units::SECOND);
+        s.push_unit((&units::METER / &units::SECOND).unwrap());
+        s.push_unit((&units::METER / &units::SECOND).unwrap());
         let h = s.height();
         assert_eq!(
             pop2!(s, Item::Number, Item::Number).unwrap_err(),
@@ -299,7 +299,7 @@ mod tests {
         );
         assert_eq!(s.height(), h);
 
-        s.push_unit(&units::METER / &units::SECOND);
+        s.push_unit((&units::METER / &units::SECOND).unwrap());
         let h = s.height();
         assert_eq!(
             pop2!(s, Item::Number, Item::Number).unwrap_err(),
