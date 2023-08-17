@@ -228,7 +228,7 @@ pub fn builtin_into(stack: &mut Stack) -> Result<(), Error> {
     match pop2!(stack, stack::Item::Number, stack::Item::Unit) {
         Ok((n, u)) => {
             if let Some(n_unit) = n.unit.as_ref() {
-                match n_unit.convert(n.value, &u) {
+                match n_unit.convert_interval(n.value, &u) {
                     Ok(value) => {
                         stack.push_number(Number::new(value).with_unit(u));
                         Ok(())

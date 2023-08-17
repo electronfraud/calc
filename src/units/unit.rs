@@ -62,12 +62,14 @@ impl Unit {
         }
     }
 
-    /// Converts a number in this unit to another unit.
+    /// Converts a number in this unit to another unit, without adjusting for
+    /// differences in zero points. This function is only suitable for
+    /// converting intervals/deltas, not absolutes.
     ///
     /// # Errors
     ///
     /// Returns an error if `self` can't be converted to `other`.
-    pub fn convert(&self, num: f64, other: &Self) -> Result<f64, Error> {
+    pub fn convert_interval(&self, num: f64, other: &Self) -> Result<f64, Error> {
         let mut num = num;
 
         if !self.is_commensurable_with(other) {
@@ -267,7 +269,10 @@ impl std::ops::Div<&'static Base> for &Unit {
 
 #[cfg(test)]
 mod tests {
-    use crate::units::{Unit, AMPERE, FOOT, HOUR, KILOGRAM, METER, MILE, NAUTICAL_MILE, SECOND};
+    use crate::units::{
+        Unit, AMPERE, CELSIUS, FAHRENHEIT, FOOT, HOUR, KILOGRAM, METER, MILE, NAUTICAL_MILE, SECOND,
+    };
+    use approx::assert_relative_eq;
 
     #[test]
     fn unit_display() {
@@ -324,17 +329,24 @@ mod tests {
     }
 
     #[test]
-    fn unit_conversion() {
+    fn interval_unit_conversion() {
         let m = Unit::new(&[&METER], &[]);
         let ft = Unit::new(&[&FOOT], &[]);
-        assert_eq!(m.convert(7.0, &ft).unwrap(), 7.0 / 0.3048);
+        assert_eq!(m.convert_interval(7.0, &ft).unwrap(), 7.0 / 0.3048);
 
         let mph = Unit::new(&[&MILE], &[&HOUR]);
         let kts = Unit::new(&[&NAUTICAL_MILE], &[&HOUR]);
-        assert_eq!(mph.convert(110.0, &kts).unwrap(), 110.0 * 1609.344 / 1852.0);
+        assert_eq!(
+            mph.convert_interval(110.0, &kts).unwrap(),
+            110.0 * 1609.344 / 1852.0
+        );
 
         let m_per_s = Unit::new(&[&METER], &[&SECOND]);
         let hz = Unit::new(&[], &[&SECOND]);
-        assert!(m_per_s.convert(1.0, &hz).is_err());
+        assert!(m_per_s.convert_interval(1.0, &hz).is_err());
+
+        let c = Unit::new(&[&CELSIUS], &[]);
+        let f = Unit::new(&[&FAHRENHEIT], &[]);
+        assert_relative_eq!(c.convert_interval(1.0, &f).unwrap(), 1.8);
     }
 }

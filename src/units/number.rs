@@ -90,7 +90,7 @@ impl std::ops::Add<&Number> for &Number {
 
         match (&self.unit, &other.unit) {
             (Some(u1), Some(u2)) => u2
-                .convert(v2, u1)
+                .convert_interval(v2, u1)
                 .map(|v2| Number::new(v1 + v2).with_unit(u1.clone())),
             (None, None) => Ok(Number::new(v1 + v2)),
             (Some(u1), None) => Err(Error::IncommensurableUnits(
@@ -119,7 +119,7 @@ impl std::ops::Sub<&Number> for &Number {
 
         match (&self.unit, &other.unit) {
             (Some(u1), Some(u2)) => u2
-                .convert(v2, u1)
+                .convert_interval(v2, u1)
                 .map(|v2| Number::new(v1 - v2).with_unit(u1.clone())),
             (None, None) => Ok(Number::new(v1 - v2)),
             (Some(u1), None) => Err(Error::IncommensurableUnits(
