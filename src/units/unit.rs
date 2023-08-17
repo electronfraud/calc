@@ -16,7 +16,8 @@
 // Foobar. If not, see <https://www.gnu.org/licenses/>.
 
 use super::{base::NUM_PHYSICAL_QUANTITIES, Base, Error};
-use Error::IncommensurableUnits;
+#[allow(clippy::enum_glob_use)]
+use Error::*;
 
 /// A unit that may measure a base quantity or a derived quantity.
 #[derive(Clone, Debug)]
@@ -94,6 +95,45 @@ impl Unit {
         for base in &other.denom {
             num *= base.factor;
         }
+
+        Ok(num)
+    }
+
+    /// Converts a number in this unit to another unit, adjusting for
+    /// differences in zero points.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if:
+    /// - `self` can't be converted to `other`; or
+    /// - the unit does not consist of a single base unit with an exponent of
+    ///   positive one.
+    pub fn convert_absolute(&self, num: f64, other: &Self) -> Result<f64, Error> {
+        let mut num = num;
+
+        if self.numer.len() + self.denom.len() > 1 {
+            return Err(TooManyBaseUnits(Box::new(self.clone())));
+        }
+        if other.numer.len() + self.denom.len() > 1 {
+            return Err(TooManyBaseUnits(Box::new(other.clone())));
+        }
+        if !self.denom.is_empty() {
+            return Err(NegativeExponent(Box::new(self.clone())));
+        }
+        if !other.denom.is_empty() {
+            return Err(NegativeExponent(Box::new(other.clone())));
+        }
+
+        if !self.is_commensurable_with(other) {
+            return Err(IncommensurableUnits(
+                Some(Box::new(self.clone())),
+                Some(Box::new(other.clone())),
+            ));
+        }
+
+        num -= self.numer[0].zero;
+        num *= self.numer[0].factor;
+        num = num.mul_add(other.numer[0].factor.recip(), other.numer[0].zero);
 
         Ok(num)
     }
@@ -347,6 +387,37 @@ mod tests {
 
         let c = Unit::new(&[&CELSIUS], &[]);
         let f = Unit::new(&[&FAHRENHEIT], &[]);
-        assert_relative_eq!(c.convert_interval(1.0, &f).unwrap(), 1.8);
+        assert_relative_eq!(c.convert_interval(1.0, &f).unwrap(), 9.0 / 5.0);
+
+        let c = Unit::new(&[], &[&CELSIUS]);
+        let f = Unit::new(&[], &[&FAHRENHEIT]);
+        assert_relative_eq!(c.convert_interval(1.0, &f).unwrap(), 5.0 / 9.0);
+    }
+
+    #[test]
+    fn absolute_unit_conversion() {
+        let m = Unit::new(&[&METER], &[]);
+        let ft = Unit::new(&[&FOOT], &[]);
+        assert_eq!(m.convert_absolute(7.0, &ft).unwrap(), 7.0 / 0.3048);
+
+        let mph = Unit::new(&[&MILE], &[&HOUR]);
+        let kts = Unit::new(&[&NAUTICAL_MILE], &[&HOUR]);
+        assert!(mph.convert_absolute(110.0, &kts).is_err());
+
+        let m_per_s = Unit::new(&[&METER], &[&SECOND]);
+        let hz = Unit::new(&[], &[&SECOND]);
+        assert!(m_per_s.convert_absolute(1.0, &hz).is_err());
+
+        let c = Unit::new(&[&CELSIUS], &[]);
+        let f = Unit::new(&[&FAHRENHEIT], &[]);
+        assert_relative_eq!(
+            c.convert_absolute(1.0, &f).unwrap(),
+            33.8,
+            epsilon = f64::EPSILON * 448.0
+        ); // 9.947598300641403e-14
+
+        let c = Unit::new(&[], &[&CELSIUS]);
+        let f = Unit::new(&[], &[&FAHRENHEIT]);
+        assert!(c.convert_absolute(1.0, &f).is_err());
     }
 }

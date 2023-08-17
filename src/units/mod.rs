@@ -31,6 +31,8 @@ pub use unit::Unit;
 #[derive(Debug)]
 pub enum Error {
     IncommensurableUnits(Option<Box<Unit>>, Option<Box<Unit>>),
+    TooManyBaseUnits(Box<Unit>),
+    NegativeExponent(Box<Unit>),
 }
 
 #[allow(clippy::enum_glob_use)]
