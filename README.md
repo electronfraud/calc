@@ -13,6 +13,11 @@ A terminal-based, units-aware, RPN calculator.
 * [Reference](#reference)
   * [Constants](#constants)
   * [Commands](#commands)
+    * [Interface](#interface)
+    * [Arithmetic](#arithmetic)
+    * [Trigonometry](#trigonometry)
+    * [Unit Conversion](#unit-conversion)
+    * [Stack Manipulation](#stack-manipulation)
   * [Units](#units-1)
 * [About](#about)
   * [License](#license)
@@ -178,14 +183,14 @@ This is a list of all available commands.
 | `acos`  | Arc cosine.  |
 | `atan`  | Arc tangent. |
 
-#### Units
+#### Unit Conversion
 
 | Name    | Description                            |
 |-------- |--------------------------------------- |
 | `drop`  | Remove the units from a number.        |
 | `into`  | Convert a number into different units. |
 
-#### Stack
+#### Stack Manipulation
 
 | Name    | Description                             |
 |-------- |---------------------------------------- |
