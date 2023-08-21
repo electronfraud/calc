@@ -217,6 +217,19 @@ pub fn builtin_clear(stack: &mut Stack) -> Result {
     Ok(())
 }
 
+/// `( a -- a a )` Duplicates the item on top of the stack.
+///
+/// # Errors
+///
+/// An error occurs if the stack is empty.
+pub fn builtin_dup(stack: &mut Stack) -> Result {
+    let mut tx = stack.begin();
+    let a = tx.pop()?;
+    tx.push(a.clone());
+    tx.push(a);
+    commit!(tx)
+}
+
 /// `( [n u] -- n )` Makes a number dimensionless.
 ///
 /// # Errors
@@ -367,6 +380,7 @@ pub fn table() -> HashMap<&'static str, Builtin> {
         ("pi", constant!(Number::new(std::f64::consts::PI))),
         // Stack
         ("clear", builtin_clear),
+        ("dup", builtin_dup),
         ("pop", builtin_pop),
         ("swap", builtin_swap),
         // Unit Conversion

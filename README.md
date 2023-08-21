@@ -151,19 +151,48 @@ There are a few built-in constants. To push one, enter its name.
 
 This is a list of all available commands.
 
+#### Interface
+
+| Name    | Description       |
+|-------- |------------------ |
+| `exit`  | Exit the program. |
+| `q`     | Exit the program. |
+
+#### Arithmetic
+
+| Name    | Description     |
+|-------- |---------------- |
+| `+`     | Addition.       |
+| `-`     | Subtraction.    |
+| `*`     | Multiplication. |
+| `/`     | Division.       |
+
+#### Trigonometry
+
+| Name    | Description  |
+|-------- |------------- |
+| `sin`   | Sine.        |
+| `cos`   | Cosine.      |
+| `tan`   | Tangent.     |
+| `asin`  | Arc sine.    |
+| `acos`  | Arc cosine.  |
+| `atan`  | Arc tangent. |
+
+#### Units
+
 | Name    | Description                            |
-|-------- |----------------------------------------|
-| `+`     | Addition.                              |
-| `-`     | Subtraction.                           |
-| `*`     | Multiplication.                        |
-| `/`     | Division.                              |
-| `clear` | Empty the stack.                       |
+|-------- |--------------------------------------- |
 | `drop`  | Remove the units from a number.        |
-| `exit`  | End the program.                       |
 | `into`  | Convert a number into different units. |
-| `pop`   | Pop an item off the stack.             |
-| `q`     | End the program.                       |
-| `swap`  | Swap the top two items on the stack.   |
+
+#### Stack
+
+| Name    | Description                             |
+|-------- |---------------------------------------- |
+| `clear` | Empty the stack.                        |
+| `dup`   | Duplicate the item on top of the stack. |
+| `pop`   | Pop an item off the stack.              |
+| `swap`  | Swap the top two items on the stack.    |
 
 ### Units
 
@@ -209,7 +238,6 @@ with this program. If not, see <https://www.gnu.org/licenses/>.
   - Integer bases (hexadecimal, binary, octal), base conversions, and
     bitwise operations
   - Exponent operator
-  - Trigonometric functions
   - Additional units
 - Conveniences
   - Adjustable output precision
