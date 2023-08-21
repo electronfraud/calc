@@ -253,26 +253,76 @@ impl Unit {
     }
 }
 
+const SUPERSCRIPTS: [&str; 10] = ["⁰", "¹", "²", "³", "⁴", "⁵", "⁶", "⁷", "⁸", "⁹"];
+
+/// Turns an integer `i` into a string using superscript digits.
+fn i_to_str_superscripts(i: usize) -> String {
+    let mut result = String::new();
+    for ch in i.to_string().chars() {
+        result.push_str(SUPERSCRIPTS[(ch as usize) - ('0' as usize)]);
+    }
+    result
+}
+
+/// Given a sequence of bases, generates a string like "m²⋅A¹⋅s¹". Each exponent
+/// is prefixed with `sign`.
+fn bases_to_string(bases: &[&Base], sign: Option<char>) -> Option<String> {
+    if bases.is_empty() {
+        return None;
+    }
+
+    // Count the number of times each base occurs, preserving the order in
+    // in which each base is first encountered.
+    let mut uniq_bases: Vec<&Base> = Vec::new();
+    let mut counts: Vec<usize> = Vec::new();
+
+    for base in bases {
+        let ix = uniq_bases
+            .iter()
+            .position(|b| b == base)
+            .unwrap_or_else(|| {
+                uniq_bases.push(base);
+                counts.push(0);
+                uniq_bases.len() - 1
+            });
+        counts[ix] += 1;
+    }
+
+    // Generate a string containing each base and its exponent.
+    let mut result = String::new();
+
+    for ix in 0..uniq_bases.len() {
+        result.push_str(uniq_bases[ix].symbol);
+        if let Some(sign) = sign {
+            result.push(sign);
+        }
+        if counts[ix] > 1 || sign.is_some() {
+            result.push_str(&i_to_str_superscripts(counts[ix]));
+        }
+        result.push('⋅');
+    }
+
+    result.pop();
+    Some(result)
+}
+
 impl std::fmt::Display for Unit {
     fn fmt(&self, fmt: &mut std::fmt::Formatter<'_>) -> Result<(), std::fmt::Error> {
+        // If the unit has an assigned symbol, just use that.
         if let Some(symbol) = &self.symbol {
             return fmt.write_fmt(format_args!("{symbol}"));
         }
 
-        let mut symbols = Vec::new();
-        symbols.extend(self.numer.iter().map(|b| b.symbol));
+        // Otherwise, generate a string with the symbol's bases and exponents.
+        let pos = bases_to_string(&self.numer, None);
+        let neg = bases_to_string(&self.denom, Some('⁻'));
 
-        fmt.write_fmt(format_args!("{}", symbols.join("⋅")))
-            .and_then(|_| {
-                if self.denom.is_empty() {
-                    Ok(())
-                } else {
-                    let prefix = if self.numer.is_empty() { "" } else { "⋅" };
-                    symbols.clear();
-                    symbols.extend(self.denom.iter().map(|b| b.symbol));
-                    fmt.write_fmt(format_args!("{prefix}{}⁻¹", symbols.join("⁻¹⋅")))
-                }
-            })
+        match (pos, neg) {
+            (Some(pos), Some(neg)) => write!(fmt, "{pos}⋅{neg}"),
+            (Some(pos), None) => write!(fmt, "{pos}"),
+            (None, Some(neg)) => write!(fmt, "{neg}"),
+            (None, None) => Ok(()),
+        }
     }
 }
 
@@ -368,6 +418,15 @@ mod tests {
             denom: vec![&SECOND, &SECOND],
         };
         assert_eq!(joule.to_string(), "J");
+    }
+
+    #[test]
+    fn unit_display_exponents() {
+        let u = (((&METER * &METER).unwrap() / &AMPERE).unwrap() / &SECOND).unwrap();
+        assert_eq!(u.to_string(), "m²⋅A⁻¹⋅s⁻¹");
+
+        let u = (&u / &SECOND).unwrap();
+        assert_eq!(u.to_string(), "m²⋅A⁻¹⋅s⁻²");
     }
 
     #[test]
