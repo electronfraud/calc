@@ -19,13 +19,13 @@
 
 use std::collections::HashMap;
 
-use crate::{commit, popn, popnn, popnu};
 use crate::{
-    stack,
+    binary, stack,
     stack::Stack,
     units,
     units::{Number, Unit, RADIAN},
 };
+use crate::{commit, popb, popbb, popn, popnn, popnu};
 
 pub enum Error {
     /// A stack error that occurred while executing a builtin.
@@ -266,6 +266,84 @@ pub fn builtin_into(stack: &mut Stack) -> Result {
     commit!(tx)
 }
 
+macro_rules! bitwise {
+    ($name: ident, $op: tt) => {
+        /// `( a b -- c )` Computes a bitwise function of two integers.
+        ///
+        /// # Errors
+        ///
+        /// An error occurs if:
+        /// - there are fewer than two items on the stack; or,
+        /// - the items are not integers.
+        pub fn $name(stack: &mut Stack) -> Result {
+            let mut tx = stack.begin();
+            let (a, b) = popbb!(tx)?;
+            tx.pushb(binary::Integer::new(a.value $op b.value, a.repr));
+            commit!(tx)
+        }
+    };
+}
+
+bitwise!(builtin_bitwise_and, &);
+bitwise!(builtin_bitwise_or, |);
+bitwise!(builtin_bitwise_xor, ^);
+
+/// `( a -- ~a )` Computes the bitwise complement of an integer.
+///
+/// # Errors
+///
+/// An error occurs if:
+/// - the stack is empty; or,
+/// - the item on top of the stack is not an integer.
+pub fn builtin_bitwise_complement(stack: &mut Stack) -> Result {
+    let mut tx = stack.begin();
+    let b = popb!(tx)?;
+    tx.pushb(binary::Integer::new(!b.value, b.repr));
+    commit!(tx)
+}
+
+macro_rules! binrepr {
+    ($name: ident, $repr: expr) => {
+        /// `( a -- a )` Changes the representation of an integer.
+        ///
+        /// # Errors
+        /// An error occurs if:
+        /// - the stack is empty; or,
+        /// - the item on top of the stack is not an integer.
+        pub fn $name(stack: &mut Stack) -> Result {
+            let mut tx = stack.begin();
+            let b = popb!(tx)?;
+            tx.pushb(b.with_repr($repr));
+            commit!(tx)
+        }
+    };
+}
+
+binrepr!(builtin_bin, binary::Representation::Binary);
+binrepr!(builtin_dec, binary::Representation::Decimal);
+binrepr!(builtin_oct, binary::Representation::Octal);
+binrepr!(builtin_hex, binary::Representation::Hexadecimal);
+
+/// `( ... a1 ... aN N -- a1 ... aN )` Removes everything from the stack except
+/// the topmost `N` items.
+///
+/// # Errors
+///
+/// Returns an error if:
+/// - the stack has fewer than N+1 items; or,
+/// - the item on top of the stack is not a dimensionless, whole, non-negative
+///   number.
+pub fn builtin_keep(stack: &mut Stack) -> Result {
+    let mut tx = stack.begin();
+    let n = popn!(tx)?;
+    if !n.is_dimensionless() || n.value.fract() != 0.0 || n.value < 0.0 {
+        return Err(Error::Stack(stack::Error::TypeMismatch));
+    }
+    #[allow(clippy::cast_possible_truncation, clippy::cast_sign_loss)]
+    tx.keep(n.value as usize)?;
+    commit!(tx)
+}
+
 /// `( a -- )` Pops an item off the stack.
 ///
 /// # Errors
@@ -381,11 +459,21 @@ pub fn table() -> HashMap<&'static str, Builtin> {
         // Stack
         ("clear", builtin_clear),
         ("dup", builtin_dup),
+        ("keep", builtin_keep),
         ("pop", builtin_pop),
         ("swap", builtin_swap),
         // Unit Conversion
         ("drop", builtin_drop),
         ("into", builtin_into),
+        // Bitwise Operations
+        ("&", builtin_bitwise_and),
+        ("|", builtin_bitwise_or),
+        ("^", builtin_bitwise_xor),
+        ("~", builtin_bitwise_complement),
+        ("bin", builtin_bin),
+        ("oct", builtin_oct),
+        ("dec", builtin_dec),
+        ("hex", builtin_hex),
         // Units
         base!(units::SECOND),
         base!(units::METER),

@@ -20,12 +20,13 @@ use std::collections::HashMap;
 use rustyline as rl;
 use rustyline::error::ReadlineError;
 
-use calc::{builtins::Builtin, stack, stack::Stack, units};
+use calc::{binary, builtins::Builtin, stack, stack::Stack, units};
 
 /// A token parsed from user input.
 enum Token {
     Number(f64),
     Word(String),
+    BinInt(binary::Integer),
 }
 
 /// Returns a REPL prompt containing the elements in the stack, e.g. "(1 2) ".
@@ -36,6 +37,7 @@ fn prompt(stack: &Stack) -> String {
         match item {
             stack::Item::Number(n) => prompt.push_str(format!("{n}").as_str()),
             stack::Item::Unit(u) => prompt.push_str(format!("{u}").as_str()),
+            stack::Item::BinInt(b) => prompt.push_str(format!("{b}").as_str()),
         };
         prompt.push(' ');
     }
@@ -53,7 +55,9 @@ fn tokenize(s: &str) -> Vec<Token> {
     let mut tokens: Vec<Token> = Vec::new();
 
     for word in s.split_ascii_whitespace() {
-        if let Ok(n) = word.parse::<f64>() {
+        if let Some(b) = binary::Integer::parse(word) {
+            tokens.push(Token::BinInt(b));
+        } else if let Ok(n) = word.parse::<f64>() {
             tokens.push(Token::Number(n));
         } else {
             tokens.push(Token::Word(String::from(word)));
@@ -66,6 +70,10 @@ fn tokenize(s: &str) -> Vec<Token> {
 /// Evaluates a number token, i.e., pushes the number onto the stack.
 fn eval_number(n: f64, stack: &mut Stack) {
     stack.pushv(n);
+}
+
+fn eval_bin_int(b: binary::Integer, stack: &mut Stack) {
+    stack.pushb(b);
 }
 
 /// Evaluates a word token by looking for a builtin with the name contained in
@@ -188,6 +196,7 @@ fn main() -> Result<(), ReadlineError> {
         for token in tokenize(input.as_str()) {
             match token {
                 Token::Number(n) => eval_number(n, &mut stack),
+                Token::BinInt(b) => eval_bin_int(b, &mut stack),
                 Token::Word(w) => {
                     if w == "exit" || w == "q" {
                         return Ok(());

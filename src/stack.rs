@@ -17,7 +17,7 @@
 
 //! The stack.
 
-use crate::units;
+use crate::{binary, units};
 
 /// Errors returned by stack operations.
 #[derive(Debug, PartialEq)]
@@ -26,6 +26,14 @@ pub enum Error {
     Underflow,
     /// Returned when the items on the stack don't have the required types.
     TypeMismatch,
+}
+
+/// An item on the stack.
+#[derive(Clone, Debug)]
+pub enum Item {
+    Number(units::Number),
+    Unit(units::Unit),
+    BinInt(binary::Integer),
 }
 
 /// A LIFO collection of numbers and units.
@@ -69,13 +77,6 @@ pub enum Error {
 /// assert_eq!(stack.height(), 1);
 /// ```
 pub struct Stack(Vec<Item>);
-
-/// An item on the stack.
-#[derive(Clone, Debug)]
-pub enum Item {
-    Number(units::Number),
-    Unit(units::Unit),
-}
 
 impl Stack {
     /// Creates an empty stack.
@@ -125,6 +126,11 @@ impl Stack {
     /// Pushes a dimensionless number onto the stack.
     pub fn pushv(&mut self, v: f64) {
         self.pushn(units::Number::new(v));
+    }
+
+    /// Pushes a binary integer onto the stack.
+    pub fn pushb(&mut self, b: binary::Integer) {
+        self.push(Item::BinInt(b));
     }
 
     /// Start a transaction.
@@ -203,6 +209,29 @@ impl Transaction<'_> {
         Ok((a, b))
     }
 
+    /// Removes everything from the stack except the topmost `n` items.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if there are fewer than `n` items on the stack.
+    pub fn keep(&mut self, n: usize) -> Result<(), Error> {
+        if self.height() < n {
+            return Err(Error::Underflow);
+        }
+
+        let mut new_pushed: Vec<Item> = Vec::with_capacity(n);
+        if self.stack_remaining > 0 && n > self.pushed.len() {
+            let n_from_stack = n - self.pushed.len();
+            let ix0 = self.stack_remaining - n_from_stack;
+            new_pushed.extend_from_slice(&self.stack.0[ix0..self.stack_remaining]);
+        }
+        new_pushed.append(&mut self.pushed);
+        self.pushed = new_pushed;
+        self.stack_remaining = 0;
+
+        Ok(())
+    }
+
     /// Pushes an item onto the stack.
     pub fn push(&mut self, item: Item) {
         self.pushed.push(item);
@@ -221,6 +250,11 @@ impl Transaction<'_> {
     /// Pushes a dimensionless number onto the stack.
     pub fn pushv(&mut self, n: f64) {
         self.pushed.push(Item::Number(units::Number::new(n)));
+    }
+
+    /// Pushes a binary integer onto the stack.
+    pub fn pushb(&mut self, b: binary::Integer) {
+        self.pushed.push(Item::BinInt(b));
     }
 
     /// Commits all pops and pushes performed during this transaction to the
@@ -260,6 +294,28 @@ macro_rules! popnu {
     ($tx: ident) => {
         $tx.pop2().and_then(|items| match items {
             ($crate::stack::Item::Number(a), $crate::stack::Item::Unit(b)) => Ok((a, b)),
+            _ => Err($crate::stack::Error::TypeMismatch),
+        })
+    };
+}
+
+/// Pops a binary integer off a stack.
+#[macro_export]
+macro_rules! popb {
+    ($tx: ident) => {
+        $tx.pop().and_then(|items| match items {
+            $crate::stack::Item::BinInt(a) => Ok(a),
+            _ => Err($crate::stack::Error::TypeMismatch),
+        })
+    };
+}
+
+/// Pops two binary integers off a stack.
+#[macro_export]
+macro_rules! popbb {
+    ($tx: ident) => {
+        $tx.pop2().and_then(|items| match items {
+            ($crate::stack::Item::BinInt(a), $crate::stack::Item::BinInt(b)) => Ok((a, b)),
             _ => Err($crate::stack::Error::TypeMismatch),
         })
     };

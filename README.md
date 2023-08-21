@@ -159,14 +159,14 @@ This is a list of all available commands.
 #### Interface
 
 | Name    | Description       |
-|-------- |------------------ |
+|---------|-------------------|
 | `exit`  | Exit the program. |
 | `q`     | Exit the program. |
 
 #### Arithmetic
 
 | Name    | Description     |
-|-------- |---------------- |
+|---------|-----------------|
 | `+`     | Addition.       |
 | `-`     | Subtraction.    |
 | `*`     | Multiplication. |
@@ -175,7 +175,7 @@ This is a list of all available commands.
 #### Trigonometry
 
 | Name    | Description  |
-|-------- |------------- |
+|---------|--------------|
 | `sin`   | Sine.        |
 | `cos`   | Cosine.      |
 | `tan`   | Tangent.     |
@@ -186,25 +186,39 @@ This is a list of all available commands.
 #### Unit Conversion
 
 | Name    | Description                            |
-|-------- |--------------------------------------- |
+|---------|----------------------------------------|
 | `drop`  | Remove the units from a number.        |
 | `into`  | Convert a number into different units. |
 
+#### Bitwise and Binary Integer Operations
+
+| Name  | Description                        |
+|-------|------------------------------------|
+| `&`   | Bitwise AND.                       |
+| `|`   | Bitwise OR.                        |
+| `^`   | Bitwise XOR.                       |
+| `~`   | Bitwise complement.                |
+| `hex` | Display an integer in hexadecimal. |
+| `dec` | Display an integer in decimal.     |
+| `oct` | Display an integer in octal.       |
+| `bin` | Display an integer in binary.      |
+
 #### Stack Manipulation
 
-| Name    | Description                             |
-|-------- |---------------------------------------- |
-| `clear` | Empty the stack.                        |
-| `dup`   | Duplicate the item on top of the stack. |
-| `pop`   | Pop an item off the stack.              |
-| `swap`  | Swap the top two items on the stack.    |
+| Name    | Description                                 |
+|---------|---------------------------------------------|
+| `clear` | Empty the stack.                            |
+| `dup`   | Duplicate the item on top of the stack.     |
+| `keep`  | Empty the stack except for the top N items. |
+| `pop`   | Pop an item off the stack.                  |
+| `swap`  | Swap the top two items on the stack.        |
 
 ### Units
 
 The following units are supported.
 
 | Symbol  | Description                                                                 |
-| ------- | --------------------------------------------------------------------------- |
+|---------| ----------------------------------------------------------------------------|
 | `degC`  | Degrees Celsius. This unit is an interval. For temperature, use `tempC`.    |
 | `degF`  | Degrees Fahrenheit. This unit is an interval. For temperature, use `tempF`. |
 | `K`     | Kelvin. The SI base unit of temperature.                                    |
