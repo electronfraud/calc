@@ -17,5 +17,6 @@
 
 pub mod binary;
 pub mod builtins;
+pub mod eval;
 pub mod stack;
 pub mod units;
