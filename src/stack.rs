@@ -56,14 +56,14 @@ pub enum Error {
 ///
 /// let mut stack = Stack::new();
 ///
-/// stack.push_value(1.0);
-/// stack.push_value(0.0);
+/// stack.pushv(1.0);
+/// stack.pushv(0.0);
 ///
 /// assert!(div(&mut stack).is_err());
 /// assert_eq!(stack.height(), 2);
 ///
 /// stack.pop();
-/// stack.push_value(2.0);
+/// stack.pushv(2.0);
 ///
 /// assert!(div(&mut stack).is_ok());
 /// assert_eq!(stack.height(), 1);
@@ -82,13 +82,6 @@ impl Stack {
     #[must_use]
     pub fn new() -> Stack {
         Stack(Vec::new())
-    }
-
-    /// Returns a reference to the item at the top of the stack, or `None` if
-    /// the stack is empty.
-    #[must_use]
-    pub fn top(&self) -> Option<&Item> {
-        self.0.last()
     }
 
     /// Returns the number of items on the stack.
@@ -120,18 +113,18 @@ impl Stack {
     }
 
     /// Pushes a number onto the stack.
-    pub fn push_number(&mut self, n: units::Number) {
+    pub fn pushn(&mut self, n: units::Number) {
         self.0.push(Item::Number(n));
     }
 
     /// Pushes a unit onto the stack.
-    pub fn push_unit(&mut self, u: units::Unit) {
+    pub fn pushu(&mut self, u: units::Unit) {
         self.0.push(Item::Unit(u));
     }
 
     /// Pushes a dimensionless number onto the stack.
-    pub fn push_value(&mut self, v: f64) {
-        self.push_number(units::Number::new(v));
+    pub fn pushv(&mut self, v: f64) {
+        self.pushn(units::Number::new(v));
     }
 
     /// Start a transaction.
@@ -152,6 +145,7 @@ impl Default for Stack {
     }
 }
 
+/// Interface to a stack transaction.
 pub struct Transaction<'a> {
     stack: &'a mut Stack,
     stack_remaining: usize,
@@ -159,6 +153,18 @@ pub struct Transaction<'a> {
 }
 
 impl Transaction<'_> {
+    /// Returns the number of items on the stack.
+    #[must_use]
+    pub fn height(&self) -> usize {
+        self.stack_remaining + self.pushed.len()
+    }
+
+    /// Returns true if the stack has no items on it.
+    #[must_use]
+    pub fn is_empty(&self) -> bool {
+        self.height() == 0
+    }
+
     /// Pops an item off the stack.
     ///
     /// # Errors
@@ -224,18 +230,6 @@ impl Transaction<'_> {
         self.stack.0.append(&mut self.pushed);
         self.stack_remaining = self.stack.height();
     }
-
-    /// Returns the number of items on the stack.
-    #[must_use]
-    pub fn height(&self) -> usize {
-        self.stack_remaining + self.pushed.len()
-    }
-
-    /// Returns true if the stack has no items on it.
-    #[must_use]
-    pub fn is_empty(&self) -> bool {
-        self.height() == 0
-    }
 }
 
 /// Pops a number off a stack.
@@ -280,46 +274,6 @@ macro_rules! commit {
     }};
 }
 
-/// Pop an item with a specified type off a stack.
-#[macro_export]
-macro_rules! pop {
-    ($stack: ident, $type: path) => {
-        $stack.pop().map_or_else(
-            || Err($crate::stack::Error::Underflow),
-            |item| match item {
-                $type(value) => Ok(value),
-                _ => {
-                    $stack.push(item);
-                    Err($crate::stack::Error::TypeMismatch)
-                }
-            },
-        )
-    };
-}
-
-/// Pop two items with specified types off a stack.
-#[macro_export]
-macro_rules! pop2 {
-    ($stack: ident, $a_type: path, $b_type: path) => {{
-        let b = $stack.pop();
-        let a = $stack.pop();
-        match (a, b) {
-            (Some($a_type(a)), Some($b_type(b))) => Ok((a, b)),
-            (Some(a), Some(b)) => {
-                $stack.push(a);
-                $stack.push(b);
-                Err($crate::stack::Error::TypeMismatch)
-            }
-            (None, Some(b)) => {
-                $stack.push(b);
-                Err($crate::stack::Error::Underflow)
-            }
-            (None, None) => Err($crate::stack::Error::Underflow),
-            _ => panic!("Impossible stack situation"),
-        }
-    }};
-}
-
 /// Iterator over a stack's items.
 pub struct Iter<'a> {
     items: &'a [Item],
@@ -356,43 +310,15 @@ impl<'a> IntoIterator for &'a Stack {
 
 #[cfg(test)]
 mod tests {
-    use crate::stack::{Error, Item, Stack};
-    use crate::units;
-
-    #[test]
-    fn top() {
-        let mut s = Stack::new();
-        assert!(s.top().is_none());
-
-        s.push_value(1.0);
-        match s.top().unwrap() {
-            Item::Number(n) => assert_eq!(n.value, 1.0),
-            _ => assert!(false),
-        }
-
-        s.push_value(2.0);
-        match s.top().unwrap() {
-            Item::Number(n) => assert_eq!(n.value, 2.0),
-            _ => assert!(false),
-        }
-
-        s.pop();
-        match s.top().unwrap() {
-            Item::Number(n) => assert_eq!(n.value, 1.0),
-            _ => assert!(false),
-        }
-
-        s.pop();
-        assert!(s.top().is_none());
-    }
+    use crate::stack::Stack;
 
     #[test]
     fn height() {
         let mut s = Stack::new();
         assert_eq!(s.height(), 0);
-        s.push_value(2.5);
+        s.pushv(2.5);
         assert_eq!(s.height(), 1);
-        s.push_value(6.2);
+        s.pushv(6.2);
         assert_eq!(s.height(), 2);
         s.pop();
         assert_eq!(s.height(), 1);
@@ -404,96 +330,13 @@ mod tests {
     fn is_empty() {
         let mut s = Stack::new();
         assert!(s.is_empty());
-        s.push_value(2.5);
+        s.pushv(2.5);
         assert!(!s.is_empty());
-        s.push_value(6.2);
+        s.pushv(6.2);
         assert!(!s.is_empty());
         s.pop();
         assert!(!s.is_empty());
         s.pop();
         assert!(s.is_empty());
-    }
-
-    #[test]
-    fn pop_underflow() {
-        let mut s = Stack::new();
-        assert_eq!(pop!(s, Item::Number).unwrap_err(), Error::Underflow);
-    }
-
-    #[test]
-    fn pop_type_mismatch() {
-        let mut s = Stack::new();
-        s.push_unit((&units::METER / &units::SECOND).unwrap());
-        let h = s.height();
-        assert_eq!(pop!(s, Item::Number).unwrap_err(), Error::TypeMismatch);
-        assert_eq!(s.height(), h);
-    }
-
-    #[test]
-    fn pop_happy() {
-        let mut s = Stack::new();
-        s.push_value(2.2);
-        let h = s.height();
-        assert_eq!(pop!(s, Item::Number).unwrap().value, 2.2);
-        assert_eq!(s.height(), h - 1);
-    }
-
-    #[test]
-    fn pop2_underflow() {
-        let mut s = Stack::new();
-        assert_eq!(
-            pop2!(s, Item::Number, Item::Number).unwrap_err(),
-            Error::Underflow
-        );
-
-        s.push_unit((&units::METER / &units::SECOND).unwrap());
-        let h = s.height();
-        assert_eq!(
-            pop2!(s, Item::Number, Item::Number).unwrap_err(),
-            Error::Underflow
-        );
-        assert_eq!(s.height(), h);
-    }
-
-    #[test]
-    fn pop2_type_mismatch() {
-        let mut s = Stack::new();
-
-        s.push_unit((&units::METER / &units::SECOND).unwrap());
-        s.push_unit((&units::METER / &units::SECOND).unwrap());
-        let h = s.height();
-        assert_eq!(
-            pop2!(s, Item::Number, Item::Number).unwrap_err(),
-            Error::TypeMismatch
-        );
-        assert_eq!(s.height(), h);
-
-        s.push_value(2.2);
-        let h = s.height();
-        assert_eq!(
-            pop2!(s, Item::Number, Item::Number).unwrap_err(),
-            Error::TypeMismatch
-        );
-        assert_eq!(s.height(), h);
-
-        s.push_unit((&units::METER / &units::SECOND).unwrap());
-        let h = s.height();
-        assert_eq!(
-            pop2!(s, Item::Number, Item::Number).unwrap_err(),
-            Error::TypeMismatch
-        );
-        assert_eq!(s.height(), h);
-    }
-
-    #[test]
-    fn pop2_happy() {
-        let mut s = Stack::new();
-        s.push_value(2.2);
-        s.push_value(4.4);
-        let h = s.height();
-        let (a, b) = pop2!(s, Item::Number, Item::Number).unwrap();
-        assert_eq!(a.value, 2.2);
-        assert_eq!(b.value, 4.4);
-        assert_eq!(s.height(), h - 2);
     }
 }

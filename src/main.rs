@@ -65,7 +65,7 @@ fn tokenize(s: &str) -> Vec<Token> {
 
 /// Evaluates a number token, i.e., pushes the number onto the stack.
 fn eval_number(n: f64, stack: &mut Stack) {
-    stack.push_value(n);
+    stack.pushv(n);
 }
 
 /// Evaluates a word token by looking for a builtin with the name contained in

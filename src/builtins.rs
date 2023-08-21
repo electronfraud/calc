@@ -291,7 +291,7 @@ pub fn builtin_unit(u: &Unit, stack: &mut Stack) {
             return tx.commit();
         }
     }
-    stack.push_unit(u.clone());
+    stack.pushu(u.clone());
 }
 
 /// Creates a `Builtin` for a `Base`.
@@ -322,7 +322,7 @@ macro_rules! unit {
 macro_rules! constant {
     ($value:expr) => {
         |stack| {
-            stack.push_number($value);
+            stack.pushn($value);
             Ok(())
         }
     };
