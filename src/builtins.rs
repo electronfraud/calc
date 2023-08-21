@@ -219,110 +219,62 @@ pub fn builtin_div(stack: &mut Stack) -> Result<(), Error> {
     }
 }
 
-/// `( a -- b )` Computes the sine of `a`.
-///
-/// # Errors
-///
-/// Returns an error if `a` is not in units measuring an angle.
-pub fn builtin_sin(stack: &mut Stack) -> Result<(), Error> {
-    let mut tx = stack.begin();
-    let n = popn!(tx)?;
+macro_rules! trig {
+    ($name: ident, $fn: ident) => {
+        /// `(a -- b)` Computes a trigonometric function.
+        ///
+        /// # Errors
+        ///
+        /// Returns an error if:
+        /// - the stack is empty;
+        /// - the item on top of the stack is not a number; or,
+        /// - the number does not have units measuring an angle.
+        pub fn $name(stack: &mut Stack) -> Result<(), Error> {
+            let mut tx = stack.begin();
+            let n = popn!(tx)?;
 
-    if let Some(u) = n.unit {
-        let nv_rad = u.convert(n.value, &RADIAN.as_unit())?;
-        tx.pushv(nv_rad.sin());
-        commit!(tx)
-    } else {
-        Err(Error::Stack(stack::Error::TypeMismatch))
-    }
+            if let Some(u) = n.unit {
+                let n = u.convert(n.value, &RADIAN.as_unit())?;
+                tx.pushv(n.$fn());
+                commit!(tx)
+            } else {
+                Err(Error::Stack(stack::Error::TypeMismatch))
+            }
+        }
+    };
 }
 
-/// `( a -- b )` Computes the cosine of `a`.
-///
-/// # Errors
-///
-/// Returns an error if `a` is not in units measuring an angle.
-pub fn builtin_cos(stack: &mut Stack) -> Result<(), Error> {
-    let mut tx = stack.begin();
-    let n = popn!(tx)?;
+trig!(builtin_sin, sin);
+trig!(builtin_cos, cos);
+trig!(builtin_tan, tan);
 
-    if let Some(u) = n.unit {
-        let nv_rad = u.convert(n.value, &RADIAN.as_unit())?;
-        tx.pushv(nv_rad.cos());
-        commit!(tx)
-    } else {
-        Err(Error::Stack(stack::Error::TypeMismatch))
-    }
+macro_rules! inverse_trig {
+    ($name: ident, $fn: ident) => {
+        /// `(a -- b)` Computes an inverse trigonometric function.
+        ///
+        /// # Errors
+        ///
+        /// Returns an error if:
+        /// - the stack is empty;
+        /// - the item on top of the stack is not a number; or,
+        /// - the number is not dimensionless.
+        pub fn $name(stack: &mut Stack) -> Result<(), Error> {
+            let mut tx = stack.begin();
+            let n = popn!(tx)?;
+
+            if n.unit.is_none() {
+                tx.pushn(Number::new(n.value.$fn()).with_unit(RADIAN.as_unit()));
+                commit!(tx)
+            } else {
+                Err(Error::Stack(stack::Error::TypeMismatch))
+            }
+        }
+    };
 }
 
-/// `( a -- b )` Computes the tangent of `a`.
-///
-/// # Errors
-///
-/// Returns an error if `a` is not in units measuring an angle.
-pub fn builtin_tan(stack: &mut Stack) -> Result<(), Error> {
-    let mut tx = stack.begin();
-    let n = popn!(tx)?;
-
-    if let Some(u) = n.unit {
-        let nv_rad = u.convert(n.value, &RADIAN.as_unit())?;
-        tx.pushv(nv_rad.tan());
-        commit!(tx)
-    } else {
-        Err(Error::Stack(stack::Error::TypeMismatch))
-    }
-}
-
-/// `( a -- b )` Computes the arc sine of `a`.
-///
-/// # Errors
-///
-/// Returns an error if `a` is not dimensionless.
-pub fn builtin_asin(stack: &mut Stack) -> Result<(), Error> {
-    let mut tx = stack.begin();
-    let n = popn!(tx)?;
-
-    if n.unit.is_none() {
-        tx.pushn(Number::new(n.value.asin()).with_unit(RADIAN.as_unit()));
-        commit!(tx)
-    } else {
-        Err(Error::Stack(stack::Error::TypeMismatch))
-    }
-}
-
-/// `( a -- b )` Computes the arc cosine of `a`.
-///
-/// # Errors
-///
-/// Returns an error if `a` is not dimensionless.
-pub fn builtin_acos(stack: &mut Stack) -> Result<(), Error> {
-    let mut tx = stack.begin();
-    let n = popn!(tx)?;
-
-    if n.unit.is_none() {
-        tx.pushn(Number::new(n.value.acos()).with_unit(RADIAN.as_unit()));
-        commit!(tx)
-    } else {
-        Err(Error::Stack(stack::Error::TypeMismatch))
-    }
-}
-
-/// `( a -- b )` Computes the arc tangent of `a`.
-///
-/// # Errors
-///
-/// Returns an error if `a` is not dimensionless.
-pub fn builtin_atan(stack: &mut Stack) -> Result<(), Error> {
-    let mut tx = stack.begin();
-    let n = popn!(tx)?;
-
-    if n.unit.is_none() {
-        tx.pushn(Number::new(n.value.atan()).with_unit(RADIAN.as_unit()));
-        commit!(tx)
-    } else {
-        Err(Error::Stack(stack::Error::TypeMismatch))
-    }
-}
+inverse_trig!(builtin_asin, asin);
+inverse_trig!(builtin_acos, acos);
+inverse_trig!(builtin_atan, atan);
 
 /// `( ... -- )` Pops everything from the stack.
 ///
