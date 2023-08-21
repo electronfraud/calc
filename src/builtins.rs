@@ -19,13 +19,13 @@
 
 use std::collections::HashMap;
 
-use crate::stack;
-use crate::stack::Stack;
-use crate::units;
-use crate::units::Number;
-use crate::units::Unit;
-use crate::units::RADIAN;
-use crate::{commit, pop, pop2, popn};
+use crate::{commit, popn, popnn, popnu};
+use crate::{
+    stack,
+    stack::Stack,
+    units,
+    units::{Number, Unit, RADIAN},
+};
 
 pub enum Error {
     /// A stack error that occurred while executing a builtin.
@@ -34,20 +34,25 @@ pub enum Error {
     Units(units::Error),
 }
 
+/// Enables the `?` operator inside implementations of builtins.
 impl From<stack::Error> for Error {
     fn from(e: stack::Error) -> Error {
         Error::Stack(e)
     }
 }
 
+/// Enables the `?` operator inside implementations of builtins.
 impl From<units::Error> for Error {
     fn from(e: units::Error) -> Error {
         Error::Units(e)
     }
 }
 
+/// The return type of a builtin.
+type Result = std::result::Result<(), Error>;
+
 /// A function that implements a builtin.
-pub type Builtin = fn(&mut Stack) -> Result<(), Error>;
+pub type Builtin = fn(&mut Stack) -> Result;
 
 /// `( a b -- a+b )` Pops two items, adds them, and pushes the result.
 ///
@@ -57,23 +62,11 @@ pub type Builtin = fn(&mut Stack) -> Result<(), Error>;
 /// - there are fewer than two items on the stack;
 /// - the items are not numbers; or,
 /// - the items have incommensurable units.
-///
-/// If there is an error, the stack is unchanged; the operands are not popped.
-pub fn builtin_add(stack: &mut Stack) -> Result<(), Error> {
-    match pop2!(stack, stack::Item::Number, stack::Item::Number) {
-        Ok((a, b)) => match &a + &b {
-            Ok(c) => {
-                stack.push_number(c);
-                Ok(())
-            }
-            Err(e) => {
-                stack.push_number(a);
-                stack.push_number(b);
-                Err(Error::Units(e))
-            }
-        },
-        Err(e) => Err(Error::Stack(e)),
-    }
+pub fn builtin_add(stack: &mut Stack) -> Result {
+    let mut tx = stack.begin();
+    let (a, b) = popnn!(tx)?;
+    tx.pushn((&a + &b)?);
+    commit!(tx)
 }
 
 /// `( a b -- a-b )` Pops two items, subtracts the topmost item from the other
@@ -85,23 +78,11 @@ pub fn builtin_add(stack: &mut Stack) -> Result<(), Error> {
 /// - there are fewer than two items on the stack;
 /// - the items are not numbers; or,
 /// - the items have incommensurable units.
-///
-/// If there is an error, the stack is unchanged; the operands are not popped.
-pub fn builtin_sub(stack: &mut Stack) -> Result<(), Error> {
-    match pop2!(stack, stack::Item::Number, stack::Item::Number) {
-        Ok((a, b)) => match &a - &b {
-            Ok(c) => {
-                stack.push_number(c);
-                Ok(())
-            }
-            Err(e) => {
-                stack.push_number(a);
-                stack.push_number(b);
-                Err(Error::Units(e))
-            }
-        },
-        Err(e) => Err(Error::Stack(e)),
-    }
+pub fn builtin_sub(stack: &mut Stack) -> Result {
+    let mut tx = stack.begin();
+    let (a, b) = popnn!(tx)?;
+    tx.pushn((&a - &b)?);
+    commit!(tx)
 }
 
 /// `( a b -- a*b )` Pops two items, multiplies them, and pushes the result.
@@ -123,42 +104,16 @@ pub fn builtin_sub(stack: &mut Stack) -> Result<(), Error> {
 /// - the items are not a number `a` and a unit `b`.
 ///
 /// If there is an error, the stack is unchanged; the operands are not popped.
-pub fn builtin_mul(stack: &mut Stack) -> Result<(), Error> {
-    // Two numbers
-    match pop2!(stack, stack::Item::Number, stack::Item::Number) {
-        Ok((a, b)) => {
-            return (&a * &b).map(|c| stack.push_number(c)).map_err(|e| {
-                stack.push_number(a);
-                stack.push_number(b);
-                Error::Units(e)
-            })
-        }
-        Err(stack::Error::TypeMismatch) => { /* do nothing */ }
-        Err(e) => return Err(Error::Stack(e)),
-    }
-
-    // Two units
-    match pop2!(stack, stack::Item::Unit, stack::Item::Unit) {
-        Ok((u1, u2)) => {
-            return (&u1 * &u2).map(|u| stack.push_unit(u)).map_err(|e| {
-                stack.push_unit(u1);
-                stack.push_unit(u2);
-                Error::Units(e)
-            })
-        }
-        Err(stack::Error::TypeMismatch) => { /* do nothing */ }
-        Err(e) => return Err(Error::Stack(e)),
-    }
-
-    // `a` is a number and `b` is a unit
-    match pop2!(stack, stack::Item::Number, stack::Item::Unit) {
-        Ok((n, u)) => (&n * &u).map(|nu| stack.push_number(nu)).map_err(|e| {
-            stack.push_number(n);
-            stack.push_unit(u);
-            Error::Units(e)
-        }),
-        Err(e) => Err(Error::Stack(e)),
-    }
+pub fn builtin_mul(stack: &mut Stack) -> Result {
+    let mut tx = stack.begin();
+    let items = tx.pop2()?;
+    match items {
+        (stack::Item::Number(a), stack::Item::Number(b)) => tx.pushn((&a * &b)?),
+        (stack::Item::Unit(a), stack::Item::Unit(b)) => tx.pushu((&a * &b)?),
+        (stack::Item::Number(a), stack::Item::Unit(b)) => tx.pushn((&a * &b)?),
+        _ => return Err(stack::Error::TypeMismatch.into()),
+    };
+    commit!(tx)
 }
 
 /// `( a b -- a/b )` Pops two items, divides them, and pushes the result.
@@ -181,44 +136,19 @@ pub fn builtin_mul(stack: &mut Stack) -> Result<(), Error> {
 /// - the division would result in a nonsensical temperature unit.
 ///
 /// If there is an error, the stack is unchanged; the operands are not popped.
-pub fn builtin_div(stack: &mut Stack) -> Result<(), Error> {
-    // Two numbers
-    match pop2!(stack, stack::Item::Number, stack::Item::Number) {
-        Ok((a, b)) => {
-            return (&a / &b).map(|c| stack.push_number(c)).map_err(|e| {
-                stack.push_number(a);
-                stack.push_number(b);
-                Error::Units(e)
-            })
-        }
-        Err(stack::Error::TypeMismatch) => { /* do nothing */ }
-        Err(e) => return Err(Error::Stack(e)),
-    }
-
-    // Two units
-    match pop2!(stack, stack::Item::Unit, stack::Item::Unit) {
-        Ok((u1, u2)) => {
-            return (&u1 / &u2).map(|u| stack.push_unit(u)).map_err(|e| {
-                stack.push_unit(u1);
-                stack.push_unit(u2);
-                Error::Units(e)
-            })
-        }
-        Err(stack::Error::TypeMismatch) => { /* do nothing */ }
-        Err(e) => return Err(Error::Stack(e)),
-    }
-
-    // `a` is a number and `b` is a unit
-    match pop2!(stack, stack::Item::Number, stack::Item::Unit) {
-        Ok((n, u)) => (&n / &u).map(|nu| stack.push_number(nu)).map_err(|e| {
-            stack.push_number(n);
-            stack.push_unit(u);
-            Error::Units(e)
-        }),
-        Err(e) => Err(Error::Stack(e)),
-    }
+pub fn builtin_div(stack: &mut Stack) -> Result {
+    let mut tx = stack.begin();
+    let items = tx.pop2()?;
+    match items {
+        (stack::Item::Number(a), stack::Item::Number(b)) => tx.pushn((&a / &b)?),
+        (stack::Item::Unit(a), stack::Item::Unit(b)) => tx.pushu((&a / &b)?),
+        (stack::Item::Number(a), stack::Item::Unit(b)) => tx.pushn((&a / &b)?),
+        _ => return Err(stack::Error::TypeMismatch.into()),
+    };
+    commit!(tx)
 }
 
+/// Macro for creating a trigonometric function builtin.
 macro_rules! trig {
     ($name: ident, $fn: ident) => {
         /// `(a -- b)` Computes a trigonometric function.
@@ -229,7 +159,7 @@ macro_rules! trig {
         /// - the stack is empty;
         /// - the item on top of the stack is not a number; or,
         /// - the number does not have units measuring an angle.
-        pub fn $name(stack: &mut Stack) -> Result<(), Error> {
+        pub fn $name(stack: &mut Stack) -> Result {
             let mut tx = stack.begin();
             let n = popn!(tx)?;
 
@@ -248,6 +178,7 @@ trig!(builtin_sin, sin);
 trig!(builtin_cos, cos);
 trig!(builtin_tan, tan);
 
+/// Macro for creating an inverse trigonometric function.
 macro_rules! inverse_trig {
     ($name: ident, $fn: ident) => {
         /// `(a -- b)` Computes an inverse trigonometric function.
@@ -258,7 +189,7 @@ macro_rules! inverse_trig {
         /// - the stack is empty;
         /// - the item on top of the stack is not a number; or,
         /// - the number is not dimensionless.
-        pub fn $name(stack: &mut Stack) -> Result<(), Error> {
+        pub fn $name(stack: &mut Stack) -> Result {
             let mut tx = stack.begin();
             let n = popn!(tx)?;
 
@@ -281,7 +212,7 @@ inverse_trig!(builtin_atan, atan);
 /// # Errors
 ///
 /// Never returns an error.
-pub fn builtin_clear(stack: &mut Stack) -> Result<(), Error> {
+pub fn builtin_clear(stack: &mut Stack) -> Result {
     stack.clear();
     Ok(())
 }
@@ -293,10 +224,11 @@ pub fn builtin_clear(stack: &mut Stack) -> Result<(), Error> {
 /// An error occurs if:
 /// - the stack is empty; or,
 /// - the item on top of the stack is not a number.
-pub fn builtin_drop(stack: &mut Stack) -> Result<(), Error> {
-    pop!(stack, stack::Item::Number)
-        .map_err(Error::Stack)
-        .map(|n| stack.push_value(n.value))
+pub fn builtin_drop(stack: &mut Stack) -> Result {
+    let mut tx = stack.begin();
+    let n = popn!(tx)?;
+    tx.pushv(n.value);
+    commit!(tx)
 }
 
 /// `( [n u1] u2 -- [n u2] )` Converts a number into different units.
@@ -309,28 +241,16 @@ pub fn builtin_drop(stack: &mut Stack) -> Result<(), Error> {
 /// - the number has units that are incommensurable with `u`.
 ///
 /// If there is an error, the stack is unchanged; the operands are not popped.
-pub fn builtin_into(stack: &mut Stack) -> Result<(), Error> {
-    match pop2!(stack, stack::Item::Number, stack::Item::Unit) {
-        Ok((n, u)) => {
-            if let Some(n_unit) = n.unit.as_ref() {
-                match n_unit.convert(n.value, &u) {
-                    Ok(value) => {
-                        stack.push_number(Number::new(value).with_unit(u));
-                        Ok(())
-                    }
-                    Err(e) => {
-                        stack.push_number(n);
-                        stack.push_unit(u);
-                        Err(Error::Units(e))
-                    }
-                }
-            } else {
-                stack.push_number(n.with_unit(u));
-                Ok(())
-            }
-        }
-        Err(e) => Err(Error::Stack(e)),
+pub fn builtin_into(stack: &mut Stack) -> Result {
+    let mut tx = stack.begin();
+    let (a, u) = popnu!(tx)?;
+    if let Some(a_unit) = a.unit {
+        let b = a_unit.convert(a.value, &u)?;
+        tx.pushn(Number::new(b).with_unit(u));
+    } else {
+        tx.pushn(a.with_unit(u));
     }
+    commit!(tx)
 }
 
 /// `( a -- )` Pops an item off the stack.
@@ -338,7 +258,7 @@ pub fn builtin_into(stack: &mut Stack) -> Result<(), Error> {
 /// # Errors
 ///
 /// Returns an error if the stack is empty.
-pub fn builtin_pop(stack: &mut Stack) -> Result<(), Error> {
+pub fn builtin_pop(stack: &mut Stack) -> Result {
     stack
         .pop()
         .map(|_| ())
@@ -351,16 +271,12 @@ pub fn builtin_pop(stack: &mut Stack) -> Result<(), Error> {
 ///
 /// Returns an error if the stack has fewer than two items.
 #[allow(clippy::missing_panics_doc)]
-pub fn builtin_swap(stack: &mut Stack) -> Result<(), Error> {
-    if stack.height() < 2 {
-        Err(Error::Stack(stack::Error::Underflow))
-    } else {
-        let b = stack.pop().unwrap();
-        let a = stack.pop().unwrap();
-        stack.push(b);
-        stack.push(a);
-        Ok(())
-    }
+pub fn builtin_swap(stack: &mut Stack) -> Result {
+    let mut tx = stack.begin();
+    let (a, b) = tx.pop2()?;
+    tx.push(b);
+    tx.push(a);
+    commit!(tx)
 }
 
 /// Builtin for words that are units.
@@ -368,12 +284,11 @@ pub fn builtin_swap(stack: &mut Stack) -> Result<(), Error> {
 /// If the item on top of the stack is a dimensionless number, that number is
 /// assigned the unit `u`. Otherwise, `u` is pushed onto the stack.
 pub fn builtin_unit(u: &Unit, stack: &mut Stack) {
-    if let Some(stack::Item::Number(n)) = stack.top() {
+    let mut tx = stack.begin();
+    if let Ok(n) = popn!(tx) {
         if n.is_dimensionless() {
-            let n = n.with_unit(u.clone());
-            stack.pop();
-            stack.push_number(n);
-            return;
+            tx.pushn(n.with_unit(u.clone()));
+            return tx.commit();
         }
     }
     stack.push_unit(u.clone());

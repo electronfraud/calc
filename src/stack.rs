@@ -159,40 +159,57 @@ pub struct Transaction<'a> {
 }
 
 impl Transaction<'_> {
-    /// Pops an item off the stack. Returns None if the stack is empty.
-    pub fn pop(&mut self) -> Option<Item> {
+    /// Pops an item off the stack.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if there are fewer than two items on the stack.
+    pub fn pop(&mut self) -> Result<Item, Error> {
         if self.is_empty() {
-            return None;
+            Err(Error::Underflow)
+        } else {
+            Ok(self.pushed.pop().unwrap_or_else(|| {
+                self.stack_remaining -= 1;
+                self.stack.0[self.stack_remaining].clone()
+            }))
         }
-
-        self.pushed.pop().or_else(|| {
-            self.stack_remaining -= 1;
-            Some(self.stack.0[self.stack_remaining].clone())
-        })
     }
 
-    /// Pops two items off the stack. Returns None if there are fewer than two
-    /// items on the stack.
-    pub fn pop2(&mut self) -> Option<(Item, Item)> {
+    /// Pops two items off the stack and returns them.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if there are fewer than two items on the stack.
+    pub fn pop2(&mut self) -> Result<(Item, Item), Error> {
         if self.height() < 2 {
-            return None;
+            return Err(Error::Underflow);
         }
 
-        let b = self.pushed.pop().or_else(|| {
+        let b = self.pushed.pop().unwrap_or_else(|| {
             self.stack_remaining -= 1;
-            Some(self.stack.0[self.stack_remaining].clone())
+            self.stack.0[self.stack_remaining].clone()
         });
-        let a = self.pushed.pop().or_else(|| {
+        let a = self.pushed.pop().unwrap_or_else(|| {
             self.stack_remaining -= 1;
-            Some(self.stack.0[self.stack_remaining].clone())
+            self.stack.0[self.stack_remaining].clone()
         });
 
-        a.zip(b)
+        Ok((a, b))
+    }
+
+    /// Pushes an item onto the stack.
+    pub fn push(&mut self, item: Item) {
+        self.pushed.push(item);
     }
 
     /// Pushes a number with units onto the stack.
     pub fn pushn(&mut self, n: units::Number) {
         self.pushed.push(Item::Number(n));
+    }
+
+    /// Pushes a unit onto the stack.
+    pub fn pushu(&mut self, u: units::Unit) {
+        self.pushed.push(Item::Unit(u));
     }
 
     /// Pushes a dimensionless number onto the stack.
@@ -221,39 +238,46 @@ impl Transaction<'_> {
     }
 }
 
-/// Commit a transaction and produce an Ok(()) value.
+/// Pops a number off a stack.
+#[macro_export]
+macro_rules! popn {
+    ($tx: ident) => {
+        $tx.pop().and_then(|items| match items {
+            $crate::stack::Item::Number(a) => Ok(a),
+            _ => Err($crate::stack::Error::TypeMismatch),
+        })
+    };
+}
+
+/// Pops two numbers off a stack.
+#[macro_export]
+macro_rules! popnn {
+    ($tx: ident) => {
+        $tx.pop2().and_then(|items| match items {
+            ($crate::stack::Item::Number(a), $crate::stack::Item::Number(b)) => Ok((a, b)),
+            _ => Err($crate::stack::Error::TypeMismatch),
+        })
+    };
+}
+
+/// Pops a number and a unit off a stack.
+#[macro_export]
+macro_rules! popnu {
+    ($tx: ident) => {
+        $tx.pop2().and_then(|items| match items {
+            ($crate::stack::Item::Number(a), $crate::stack::Item::Unit(b)) => Ok((a, b)),
+            _ => Err($crate::stack::Error::TypeMismatch),
+        })
+    };
+}
+
+/// Commits a transaction. Evaluates to `Ok(())`.
 #[macro_export]
 macro_rules! commit {
     ($tx: ident) => {{
         $tx.commit();
         Ok(())
     }};
-}
-
-/// Pop two numbers off a stack in a transaction.
-#[macro_export]
-macro_rules! popnn {
-    ($tx: ident) => {
-        $tx.pop2()
-            .map(|items| match items {
-                ($crate::stack::Item::Number(a), $crate::stack::Item::Number(b)) => Ok((a, b)),
-                _ => Err($crate::stack::Error::TypeMismatch),
-            })
-            .unwrap_or(Err($crate::stack::Error::Underflow))
-    };
-}
-
-/// Pop a number off a stack in a transaction.
-#[macro_export]
-macro_rules! popn {
-    ($tx: ident) => {
-        $tx.pop()
-            .map(|items| match items {
-                $crate::stack::Item::Number(a) => Ok(a),
-                _ => Err($crate::stack::Error::TypeMismatch),
-            })
-            .unwrap_or(Err($crate::stack::Error::Underflow))
-    };
 }
 
 /// Pop an item with a specified type off a stack.
