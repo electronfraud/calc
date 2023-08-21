@@ -15,7 +15,7 @@
 // You should have received a copy of the GNU General Public License along with
 // calc. If not, see <https://www.gnu.org/licenses/>.
 
-use super::{base::NUM_PHYSICAL_QUANTITIES, Base, Error};
+use super::{base::NUM_PHYSICAL_QUANTITIES, Base, Error, PhysicalQuantity};
 #[allow(clippy::enum_glob_use)]
 use Error::*;
 
@@ -207,6 +207,17 @@ impl Unit {
         // Otherwise both units must have a zero, or both units must not have a
         // zero.
         (a.is_some() && b.is_some()) || (a.is_none() && b.is_none())
+    }
+
+    /// Returns true if this unit has only one base, the base's exponent is +1,
+    /// and the base measures the specified physical quantity.
+    #[must_use]
+    pub fn measures(&self, q: PhysicalQuantity) -> bool {
+        if self.numer.len() != 1 || !self.denom.is_empty() {
+            return false;
+        }
+
+        self.numer[0].physq == q
     }
 
     /// Returns a new `Unit` mathematically identical to this one but without

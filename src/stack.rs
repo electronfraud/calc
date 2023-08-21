@@ -29,10 +29,49 @@ pub enum Error {
 }
 
 /// A LIFO collection of numbers and units.
+///
+/// # Examples
+///
+/// Stacks can be used in transactions so that if an operation on a popped
+/// value fails, the transaction can be rolled back and the value remains on
+/// the stack. Transactions are automatically rolled back if they fall out of
+/// scope without being committed.
+///
+/// ```
+/// use calc::stack::{Error, Item::Number, Stack};
+/// use calc::{commit, popnn};
+///
+/// fn div(stack: &mut Stack) -> Result<(), Error> {
+///     let mut tx = stack.begin();
+///
+///     let (a, b) = popnn!(tx)?;
+///
+///     if b.value == 0.0 {
+///         return Err(Error::TypeMismatch);
+///     }
+///
+///     tx.pushv(a.value / b.value);
+///     commit!(tx)
+/// }
+///
+/// let mut stack = Stack::new();
+///
+/// stack.push_value(1.0);
+/// stack.push_value(0.0);
+///
+/// assert!(div(&mut stack).is_err());
+/// assert_eq!(stack.height(), 2);
+///
+/// stack.pop();
+/// stack.push_value(2.0);
+///
+/// assert!(div(&mut stack).is_ok());
+/// assert_eq!(stack.height(), 1);
+/// ```
 pub struct Stack(Vec<Item>);
 
 /// An item on the stack.
-#[derive(Debug)]
+#[derive(Clone, Debug)]
 pub enum Item {
     Number(units::Number),
     Unit(units::Unit),
@@ -94,6 +133,16 @@ impl Stack {
     pub fn push_value(&mut self, v: f64) {
         self.push_number(units::Number::new(v));
     }
+
+    /// Start a transaction.
+    pub fn begin(&mut self) -> Transaction {
+        let stack_remaining = self.height();
+        Transaction {
+            stack: self,
+            stack_remaining,
+            pushed: Vec::new(),
+        }
+    }
 }
 
 impl Default for Stack {
@@ -101,6 +150,110 @@ impl Default for Stack {
     fn default() -> Self {
         Self::new()
     }
+}
+
+pub struct Transaction<'a> {
+    stack: &'a mut Stack,
+    stack_remaining: usize,
+    pushed: Vec<Item>,
+}
+
+impl Transaction<'_> {
+    /// Pops an item off the stack. Returns None if the stack is empty.
+    pub fn pop(&mut self) -> Option<Item> {
+        if self.is_empty() {
+            return None;
+        }
+
+        self.pushed.pop().or_else(|| {
+            self.stack_remaining -= 1;
+            Some(self.stack.0[self.stack_remaining].clone())
+        })
+    }
+
+    /// Pops two items off the stack. Returns None if there are fewer than two
+    /// items on the stack.
+    pub fn pop2(&mut self) -> Option<(Item, Item)> {
+        if self.height() < 2 {
+            return None;
+        }
+
+        let b = self.pushed.pop().or_else(|| {
+            self.stack_remaining -= 1;
+            Some(self.stack.0[self.stack_remaining].clone())
+        });
+        let a = self.pushed.pop().or_else(|| {
+            self.stack_remaining -= 1;
+            Some(self.stack.0[self.stack_remaining].clone())
+        });
+
+        a.zip(b)
+    }
+
+    /// Pushes a number with units onto the stack.
+    pub fn pushn(&mut self, n: units::Number) {
+        self.pushed.push(Item::Number(n));
+    }
+
+    /// Pushes a dimensionless number onto the stack.
+    pub fn pushv(&mut self, n: f64) {
+        self.pushed.push(Item::Number(units::Number::new(n)));
+    }
+
+    /// Commits all pops and pushes performed during this transaction to the
+    /// stack and ends the transaction.
+    pub fn commit(&mut self) {
+        self.stack.0.truncate(self.stack_remaining);
+        self.stack.0.append(&mut self.pushed);
+        self.stack_remaining = self.stack.height();
+    }
+
+    /// Returns the number of items on the stack.
+    #[must_use]
+    pub fn height(&self) -> usize {
+        self.stack_remaining + self.pushed.len()
+    }
+
+    /// Returns true if the stack has no items on it.
+    #[must_use]
+    pub fn is_empty(&self) -> bool {
+        self.height() == 0
+    }
+}
+
+/// Commit a transaction and produce an Ok(()) value.
+#[macro_export]
+macro_rules! commit {
+    ($tx: ident) => {{
+        $tx.commit();
+        Ok(())
+    }};
+}
+
+/// Pop two numbers off a stack in a transaction.
+#[macro_export]
+macro_rules! popnn {
+    ($tx: ident) => {
+        $tx.pop2()
+            .map(|items| match items {
+                ($crate::stack::Item::Number(a), $crate::stack::Item::Number(b)) => Ok((a, b)),
+                _ => Err($crate::stack::Error::TypeMismatch),
+            })
+            .unwrap_or(Err($crate::stack::Error::Underflow))
+    };
+}
+
+/// Pop a number off a stack in a transaction.
+#[macro_export]
+macro_rules! popn {
+    ($tx: ident) => {
+        $tx.pop()
+            .map(|items| match items {
+                $crate::stack::Item::Number(a) => Ok(a),
+                _ => Err($crate::stack::Error::TypeMismatch),
+            })
+            .unwrap_or(Err($crate::stack::Error::Underflow))
+    };
 }
 
 /// Pop an item with a specified type off a stack.

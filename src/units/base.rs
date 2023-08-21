@@ -77,6 +77,13 @@ impl Base {
             zero: Some(z),
         }
     }
+
+    /// Returns a `Unit` that consists of this base unit with an exponent of +1.
+    #[allow(clippy::missing_panics_doc)]
+    #[must_use]
+    pub fn as_unit(&'static self) -> Unit {
+        Unit::new(&[self], &[]).unwrap()
+    }
 }
 
 impl std::fmt::Display for Base {
