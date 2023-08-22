@@ -52,7 +52,9 @@ impl Number {
 
 impl std::fmt::Display for Number {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> Result<(), std::fmt::Error> {
-        let value = if self.value < 0.001 || self.value >= 10_000_000_000.0 {
+        let value = if (self.value.abs() < 0.001 && self.value != 0.0)
+            || self.value.abs() >= 10_000_000_000.0
+        {
             let e = format!("{:.6e}", self.value);
             let halves: Vec<&str> = e.splitn(2, 'e').collect();
             halves[0]
