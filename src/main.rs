@@ -71,6 +71,8 @@ fn print_error(error: &eval::Error, word: &String) {
             builtins::Error::Stack(e) => match e {
                 stack::Error::TypeMismatch => println!("type mismatch"),
                 stack::Error::Underflow => println!("stack underflow"),
+                stack::Error::NotAnInteger => println!("number must be whole"),
+                stack::Error::NotDimensionless => println!("number must be dimensionless"),
             },
             builtins::Error::Units(e) => match e {
                 units::Error::IncommensurableUnits(_, _) => {

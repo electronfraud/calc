@@ -27,38 +27,38 @@
 //! scope without being committed.
 //!
 //! ```
-//! use calc::stack::{Error, Item::Number, Stack};
-//! use calc::{commit, popnn};
+//! use calc::stack::{Error, Item::Float, Stack};
+//! use calc::{commit, popff};
 //!
 //! fn div(stack: &mut Stack) -> Result<(), Error> {
 //!     let mut tx = stack.begin();
 //!
-//!     let (a, b) = popnn!(tx)?;
+//!     let (a, b) = popff!(tx)?;
 //!
 //!     if b.value == 0.0 {
 //!         return Err(Error::TypeMismatch);
 //!     }
 //!
-//!     tx.pushv(a.value / b.value);
+//!     tx.pushx(a.value / b.value);
 //!     commit!(tx)
 //! }
 //!
 //! let mut stack = Stack::new();
 //!
-//! stack.pushv(1.0);
-//! stack.pushv(0.0);
+//! stack.pushx(1.0);
+//! stack.pushx(0.0);
 //!
 //! assert!(div(&mut stack).is_err());
 //! assert_eq!(stack.height(), 2);
 //!
 //! stack.pop();
-//! stack.pushv(2.0);
+//! stack.pushx(2.0);
 //!
 //! assert!(div(&mut stack).is_ok());
 //! assert_eq!(stack.height(), 1);
 //! ```
 
-use crate::{binary, units};
+use crate::{integer, units};
 
 /// Errors returned by stack operations.
 #[derive(Debug, PartialEq)]
@@ -67,14 +67,19 @@ pub enum Error {
     Underflow,
     /// Returned when the items on the stack don't have the required types.
     TypeMismatch,
+    /// Returned when an integer is required but a floating-point value has a
+    /// fractional component.
+    NotAnInteger,
+    /// Returned when a dimensionless number is required but a value has units.
+    NotDimensionless,
 }
 
 /// An item on the stack.
 #[derive(Clone, Debug)]
 pub enum Item {
-    Number(units::Number),
+    Float(units::Number),
+    Integer(integer::Integer),
     Unit(units::Unit),
-    BinInt(binary::Integer),
 }
 
 /// A LIFO collection of typed objects.
@@ -116,9 +121,9 @@ impl Stack {
         self.0.push(item);
     }
 
-    /// Pushes a number onto the stack.
-    pub fn pushn(&mut self, n: units::Number) {
-        self.0.push(Item::Number(n));
+    /// Pushes a floating-point number with optional units onto the stack.
+    pub fn pushf(&mut self, x: units::Number) {
+        self.0.push(Item::Float(x));
     }
 
     /// Pushes a unit onto the stack.
@@ -126,14 +131,14 @@ impl Stack {
         self.0.push(Item::Unit(u));
     }
 
-    /// Pushes a dimensionless number onto the stack.
-    pub fn pushv(&mut self, v: f64) {
-        self.pushn(units::Number::new(v));
+    /// Pushes a dimensionless floating-point number onto the stack.
+    pub fn pushx(&mut self, x: f64) {
+        self.pushf(units::Number::new(x));
     }
 
-    /// Pushes a binary integer onto the stack.
-    pub fn pushb(&mut self, b: binary::Integer) {
-        self.push(Item::BinInt(b));
+    /// Pushes an integer onto the stack.
+    pub fn pushi(&mut self, x: integer::Integer) {
+        self.push(Item::Integer(x));
     }
 
     /// Starts a transaction.
@@ -246,9 +251,9 @@ impl Transaction<'_> {
         self.pushed.push(item);
     }
 
-    /// Pushes a number with units onto the stack.
-    pub fn pushn(&mut self, n: units::Number) {
-        self.pushed.push(Item::Number(n));
+    /// Pushes a floating-point number with optional units onto the stack.
+    pub fn pushf(&mut self, x: units::Number) {
+        self.pushed.push(Item::Float(x));
     }
 
     /// Pushes a unit onto the stack.
@@ -256,14 +261,14 @@ impl Transaction<'_> {
         self.pushed.push(Item::Unit(u));
     }
 
-    /// Pushes a dimensionless number onto the stack.
-    pub fn pushv(&mut self, n: f64) {
-        self.pushed.push(Item::Number(units::Number::new(n)));
+    /// Pushes a dimensionless floating-point number onto the stack.
+    pub fn pushx(&mut self, x: f64) {
+        self.pushed.push(Item::Float(units::Number::new(x)));
     }
 
-    /// Pushes a binary integer onto the stack.
-    pub fn pushb(&mut self, b: binary::Integer) {
-        self.pushed.push(Item::BinInt(b));
+    /// Pushes an integer onto the stack.
+    pub fn pushi(&mut self, x: integer::Integer) {
+        self.pushed.push(Item::Integer(x));
     }
 
     /// Commits all pops and pushes performed during this transaction to the
@@ -278,56 +283,147 @@ impl Transaction<'_> {
     }
 }
 
-/// Pops a number off a stack.
+#[doc(hidden)]
+pub fn float_as_int(x: &units::Number) -> Result<integer::Integer, Error> {
+    if x.value.fract() != 0.0 {
+        Err(Error::NotAnInteger)
+    } else if !x.is_dimensionless() {
+        Err(Error::NotDimensionless)
+    } else {
+        #[allow(clippy::cast_possible_truncation)]
+        Ok(integer::Integer::dec(x.value as i64))
+    }
+}
+
+#[doc(hidden)]
+pub fn zip<T, U>(a: Result<T, Error>, b: Result<U, Error>) -> Result<(T, U), Error> {
+    match (a, b) {
+        (Ok(a), Ok(b)) => Ok((a, b)),
+        (Err(a), _) => Err(a),
+        (_, Err(b)) => Err(b),
+    }
+}
+
+/// Pops a numeric item off the stack. When successful, the result will always
+/// be a `units::Number`, even if the popped item was an integer.
+#[macro_export]
+macro_rules! pop_as_f {
+    ($stacklike: ident) => {
+        $stacklike.pop().and_then(|item| match item {
+            $crate::stack::Item::Float(x) => Ok(x),
+            $crate::stack::Item::Integer(x) => Ok($crate::units::Number::new(x.value as f64)),
+            _ => Err($crate::stack::Error::TypeMismatch),
+        })
+    };
+}
+
+/// Pops a numeric item and a unit off the stack. When successful, the numeric
+/// item will always be a `units::Number`, even if the popped item was an
+/// integer.
+#[macro_export]
+macro_rules! pop_as_fu {
+    ($stacklike: ident) => {
+        $stacklike.pop2().and_then(|items| match items {
+            ($crate::stack::Item::Float(x), $crate::stack::Item::Unit(u)) => Ok((x, u)),
+            ($crate::stack::Item::Integer(x), $crate::stack::Item::Unit(u)) => {
+                Ok((x.as_units_number(), u))
+            }
+            _ => Err($crate::stack::Error::TypeMismatch),
+        })
+    };
+}
+
+/// Pops a numeric item off the stack. Floating-point numbers must not have a
+/// fractional component. When successful, the result of this macro will always
+/// be an `integer::Integer`.
+#[macro_export]
+macro_rules! pop_as_i {
+    ($stacklike: ident) => {
+        $stacklike.pop().and_then(|item| match item {
+            $crate::stack::Item::Float(x) => $crate::stack::float_as_int(&x),
+            $crate::stack::Item::Integer(x) => Ok(x),
+            _ => Err($crate::stack::Error::TypeMismatch),
+        })
+    };
+}
+
+/// Pops two numeric items off the stack. Floating-point numbers must not have
+/// fractional components. When successful, the result of this macro will
+/// always be two `integer::Integer`s.
+#[macro_export]
+macro_rules! pop_as_ii {
+    ($stacklike: ident) => {
+        $stacklike.pop2().and_then(|items| match items {
+            ($crate::stack::Item::Float(a), $crate::stack::Item::Float(b)) => $crate::stack::zip(
+                $crate::stack::float_as_int(&a),
+                $crate::stack::float_as_int(&b),
+            ),
+            ($crate::stack::Item::Float(a), $crate::stack::Item::Integer(b)) => {
+                $crate::stack::float_as_int(&a).map(|a| (a, b))
+            }
+            ($crate::stack::Item::Integer(a), $crate::stack::Item::Float(b)) => {
+                $crate::stack::float_as_int(&b).map(|b| (a, b))
+            }
+            ($crate::stack::Item::Integer(a), $crate::stack::Item::Integer(b)) => Ok((a, b)),
+            _ => Err($crate::stack::Error::TypeMismatch),
+        })
+    };
+}
+
+/// Pops a numeric items off the stack and returns it without casting.
 #[macro_export]
 macro_rules! popn {
-    ($tx: ident) => {
-        $tx.pop().and_then(|items| match items {
-            $crate::stack::Item::Number(a) => Ok(a),
+    ($stacklike: ident) => {
+        $stacklike.pop().and_then(|item| match &item {
+            $crate::stack::Item::Float(_) => Ok(item),
+            $crate::stack::Item::Integer(_) => Ok(item),
             _ => Err($crate::stack::Error::TypeMismatch),
         })
     };
 }
 
-/// Pops two numbers off a stack.
+/// Pops two numeric items off the stack and returns them without casting.
 #[macro_export]
 macro_rules! popnn {
-    ($tx: ident) => {
-        $tx.pop2().and_then(|items| match items {
-            ($crate::stack::Item::Number(a), $crate::stack::Item::Number(b)) => Ok((a, b)),
+    ($stacklike: ident) => {
+        $stacklike.pop2().and_then(|items| match &items {
+            ($crate::stack::Item::Float(_), $crate::stack::Item::Float(_)) => Ok(items),
+            ($crate::stack::Item::Float(_), $crate::stack::Item::Integer(_)) => Ok(items),
+            ($crate::stack::Item::Integer(_), $crate::stack::Item::Float(_)) => Ok(items),
+            ($crate::stack::Item::Integer(_), $crate::stack::Item::Integer(_)) => Ok(items),
             _ => Err($crate::stack::Error::TypeMismatch),
         })
     };
 }
 
-/// Pops a number and a unit off a stack.
+/// Pops a floating-point number off a stack.
 #[macro_export]
-macro_rules! popnu {
-    ($tx: ident) => {
-        $tx.pop2().and_then(|items| match items {
-            ($crate::stack::Item::Number(a), $crate::stack::Item::Unit(b)) => Ok((a, b)),
-            _ => Err($crate::stack::Error::TypeMismatch),
-        })
-    };
-}
-
-/// Pops a binary integer off a stack.
-#[macro_export]
-macro_rules! popb {
+macro_rules! popf {
     ($tx: ident) => {
         $tx.pop().and_then(|items| match items {
-            $crate::stack::Item::BinInt(a) => Ok(a),
+            $crate::stack::Item::Float(a) => Ok(a),
             _ => Err($crate::stack::Error::TypeMismatch),
         })
     };
 }
 
-/// Pops two binary integers off a stack.
+/// Pops two floating-point numbers off a stack.
 #[macro_export]
-macro_rules! popbb {
+macro_rules! popff {
     ($tx: ident) => {
         $tx.pop2().and_then(|items| match items {
-            ($crate::stack::Item::BinInt(a), $crate::stack::Item::BinInt(b)) => Ok((a, b)),
+            ($crate::stack::Item::Float(a), $crate::stack::Item::Float(b)) => Ok((a, b)),
+            _ => Err($crate::stack::Error::TypeMismatch),
+        })
+    };
+}
+
+/// Pops a floating-point number and a unit off a stack.
+#[macro_export]
+macro_rules! popfu {
+    ($tx: ident) => {
+        $tx.pop2().and_then(|items| match items {
+            ($crate::stack::Item::Float(a), $crate::stack::Item::Unit(b)) => Ok((a, b)),
             _ => Err($crate::stack::Error::TypeMismatch),
         })
     };
@@ -384,9 +480,9 @@ mod tests {
     fn height() {
         let mut s = Stack::new();
         assert_eq!(s.height(), 0);
-        s.pushv(2.5);
+        s.pushx(2.5);
         assert_eq!(s.height(), 1);
-        s.pushv(6.2);
+        s.pushx(6.2);
         assert_eq!(s.height(), 2);
         s.pop();
         assert_eq!(s.height(), 1);
@@ -398,9 +494,9 @@ mod tests {
     fn is_empty() {
         let mut s = Stack::new();
         assert!(s.is_empty());
-        s.pushv(2.5);
+        s.pushx(2.5);
         assert!(!s.is_empty());
-        s.pushv(6.2);
+        s.pushx(6.2);
         assert!(!s.is_empty());
         s.pop();
         assert!(!s.is_empty());

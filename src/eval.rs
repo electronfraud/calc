@@ -2,7 +2,7 @@
 
 use std::string::ToString;
 
-use crate::{binary, builtins, stack, stack::Stack};
+use crate::{builtins, integer, stack, stack::Stack};
 
 /// An evaluation context.
 pub struct Context {
@@ -41,8 +41,8 @@ impl Context {
     pub fn eval(&mut self, input: &str) -> Status {
         for token in Token::split(input) {
             match token {
-                Token::BinInt(b) => self.eval_bin_int(b),
-                Token::Number(n) => self.eval_number(n),
+                Token::Float(n) => self.eval_float(n),
+                Token::Integer(b) => self.eval_integer(b),
                 Token::Word(w) => {
                     if w == "exit" || w == "q" {
                         return Status::Exit;
@@ -56,14 +56,14 @@ impl Context {
         Status::Ok
     }
 
-    /// Evaluates a `binary::Integer`, i.e., pushes the integer onto the stack.
-    fn eval_bin_int(&mut self, b: binary::Integer) {
-        self.stack.pushb(b);
+    /// Evaluates an integer by pushing it onto the stack.
+    fn eval_integer(&mut self, x: integer::Integer) {
+        self.stack.pushi(x);
     }
 
-    /// Evaluates a number token, i.e., pushes the number onto the stack.
-    fn eval_number(&mut self, n: f64) {
-        self.stack.pushv(n);
+    /// Evaluates a floating point number token by pushing it onto the stack.
+    fn eval_float(&mut self, x: f64) {
+        self.stack.pushx(x);
     }
 
     /// Evaluates a word token by looking for a builtin with the name contained in
@@ -90,9 +90,9 @@ impl Context {
 
         for item in &self.stack {
             match item {
-                stack::Item::Number(n) => prompt.push_str(format!("{n}").as_str()),
+                stack::Item::Float(n) => prompt.push_str(format!("{n}").as_str()),
+                stack::Item::Integer(b) => prompt.push_str(format!("{b}").as_str()),
                 stack::Item::Unit(u) => prompt.push_str(format!("{u}").as_str()),
-                stack::Item::BinInt(b) => prompt.push_str(format!("{b}").as_str()),
             };
             prompt.push(' ');
         }
@@ -119,8 +119,8 @@ impl Default for Context {
 
 /// A token parsed from user input.
 enum Token {
-    BinInt(binary::Integer),
-    Number(f64),
+    Float(f64),
+    Integer(integer::Integer),
     Word(String),
 }
 
@@ -129,12 +129,15 @@ impl Token {
     fn split(s: &str) -> Vec<Token> {
         let mut tokens: Vec<Token> = Vec::new();
         for word in s.split_ascii_whitespace() {
-            if let Some(b) = binary::Integer::parse(word) {
-                tokens.push(Token::BinInt(b));
-            } else if let Ok(n) = word.parse::<f64>() {
-                tokens.push(Token::Number(n));
+            if let Some(x) = integer::Integer::parse(word) {
+                tokens.push(Token::Integer(x));
             } else {
-                tokens.push(Token::Word(String::from(word)));
+                let no_commas = word.replace(',', "");
+                if let Ok(x) = no_commas.parse::<f64>() {
+                    tokens.push(Token::Float(x));
+                } else {
+                    tokens.push(Token::Word(String::from(word)));
+                }
             }
         }
         tokens

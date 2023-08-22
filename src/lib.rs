@@ -15,8 +15,8 @@
 // You should have received a copy of the GNU General Public License along with
 // calc. If not, see <https://www.gnu.org/licenses/>.
 
-pub mod binary;
 pub mod builtins;
 pub mod eval;
+pub mod integer;
 pub mod stack;
 pub mod units;

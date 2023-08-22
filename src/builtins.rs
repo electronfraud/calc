@@ -19,13 +19,13 @@
 
 use std::collections::HashMap;
 
+use crate::{commit, pop_as_f, pop_as_fu, pop_as_i, pop_as_ii, popf, popn, popnn};
 use crate::{
-    binary, stack,
+    integer, stack,
     stack::Stack,
     units,
     units::{Number, Unit, RADIAN},
 };
-use crate::{commit, popb, popbb, popn, popnn, popnu};
 
 /// An error that occurred while executing a builtin.
 #[derive(Debug, PartialEq)]
@@ -75,10 +75,17 @@ pub type Table = HashMap<&'static str, Builtin>;
 /// - there are fewer than two items on the stack;
 /// - the items are not numbers; or,
 /// - the items have incommensurable units.
+#[allow(clippy::missing_panics_doc)]
 pub fn builtin_add(stack: &mut Stack) -> Result {
     let mut tx = stack.begin();
     let (a, b) = popnn!(tx)?;
-    tx.pushn((&a + &b)?);
+    match (a, b) {
+        (stack::Item::Float(a), stack::Item::Float(b)) => tx.pushf((&a + &b)?),
+        (stack::Item::Float(a), stack::Item::Integer(b)) => tx.pushf((&a + &b.as_units_number())?),
+        (stack::Item::Integer(a), stack::Item::Float(b)) => tx.pushf((&a + &b)?),
+        (stack::Item::Integer(a), stack::Item::Integer(b)) => tx.pushi(&a + &b),
+        _ => panic!("invariant wasn't"),
+    }
     commit!(tx)
 }
 
@@ -91,10 +98,17 @@ pub fn builtin_add(stack: &mut Stack) -> Result {
 /// - there are fewer than two items on the stack;
 /// - the items are not numbers; or,
 /// - the items have incommensurable units.
+#[allow(clippy::missing_panics_doc)]
 pub fn builtin_sub(stack: &mut Stack) -> Result {
     let mut tx = stack.begin();
     let (a, b) = popnn!(tx)?;
-    tx.pushn((&a - &b)?);
+    match (a, b) {
+        (stack::Item::Float(a), stack::Item::Float(b)) => tx.pushf((&a - &b)?),
+        (stack::Item::Float(a), stack::Item::Integer(b)) => tx.pushf((&a - &b.as_units_number())?),
+        (stack::Item::Integer(a), stack::Item::Float(b)) => tx.pushf((&a - &b)?),
+        (stack::Item::Integer(a), stack::Item::Integer(b)) => tx.pushi(&a - &b),
+        _ => panic!("invariant wasn't"),
+    }
     commit!(tx)
 }
 
@@ -121,9 +135,13 @@ pub fn builtin_mul(stack: &mut Stack) -> Result {
     let mut tx = stack.begin();
     let items = tx.pop2()?;
     match items {
-        (stack::Item::Number(a), stack::Item::Number(b)) => tx.pushn((&a * &b)?),
+        (stack::Item::Float(a), stack::Item::Float(b)) => tx.pushf((&a * &b)?),
+        (stack::Item::Float(a), stack::Item::Integer(b)) => tx.pushf((&a * &b.as_units_number())?),
+        (stack::Item::Integer(a), stack::Item::Float(b)) => tx.pushf((&a * &b)?),
+        (stack::Item::Integer(a), stack::Item::Integer(b)) => tx.pushi(&a * &b),
         (stack::Item::Unit(a), stack::Item::Unit(b)) => tx.pushu((&a * &b)?),
-        (stack::Item::Number(a), stack::Item::Unit(b)) => tx.pushn((&a * &b)?),
+        (stack::Item::Float(a), stack::Item::Unit(b)) => tx.pushf((&a * &b)?),
+        (stack::Item::Integer(a), stack::Item::Unit(b)) => tx.pushf((&a * &b)?),
         _ => return Err(stack::Error::TypeMismatch.into()),
     };
     commit!(tx)
@@ -153,9 +171,13 @@ pub fn builtin_div(stack: &mut Stack) -> Result {
     let mut tx = stack.begin();
     let items = tx.pop2()?;
     match items {
-        (stack::Item::Number(a), stack::Item::Number(b)) => tx.pushn((&a / &b)?),
+        (stack::Item::Float(a), stack::Item::Float(b)) => tx.pushf((&a / &b)?),
+        (stack::Item::Float(a), stack::Item::Integer(b)) => tx.pushf((&a / &b.as_units_number())?),
+        (stack::Item::Integer(a), stack::Item::Float(b)) => tx.pushf((&a / &b)?),
+        (stack::Item::Integer(a), stack::Item::Integer(b)) => tx.pushf(&a / &b),
         (stack::Item::Unit(a), stack::Item::Unit(b)) => tx.pushu((&a / &b)?),
-        (stack::Item::Number(a), stack::Item::Unit(b)) => tx.pushn((&a / &b)?),
+        (stack::Item::Float(a), stack::Item::Unit(b)) => tx.pushf((&a / &b)?),
+        (stack::Item::Integer(a), stack::Item::Unit(b)) => tx.pushf((&a / &b)?),
         _ => return Err(stack::Error::TypeMismatch.into()),
     };
     commit!(tx)
@@ -174,11 +196,11 @@ macro_rules! trig {
         /// - the number does not have units measuring an angle.
         pub fn $name(stack: &mut Stack) -> Result {
             let mut tx = stack.begin();
-            let n = popn!(tx)?;
+            let n = pop_as_f!(tx)?;
 
             if let Some(u) = n.unit {
                 let n = u.convert(n.value, &RADIAN.as_unit())?;
-                tx.pushv(n.$fn());
+                tx.pushx(n.$fn());
                 commit!(tx)
             } else {
                 Err(Error::MissingUnit)
@@ -204,10 +226,10 @@ macro_rules! inverse_trig {
         /// - the number is not dimensionless.
         pub fn $name(stack: &mut Stack) -> Result {
             let mut tx = stack.begin();
-            let n = popn!(tx)?;
+            let n = pop_as_f!(tx)?;
 
             if n.unit.is_none() {
-                tx.pushn(Number::new(n.value.$fn()).with_unit(RADIAN.as_unit()));
+                tx.pushf(Number::new(n.value.$fn()).with_unit(RADIAN.as_unit()));
                 commit!(tx)
             } else {
                 Err(Error::NotDimensionless)
@@ -252,8 +274,8 @@ pub fn builtin_dup(stack: &mut Stack) -> Result {
 /// - the item on top of the stack is not a number.
 pub fn builtin_drop(stack: &mut Stack) -> Result {
     let mut tx = stack.begin();
-    let n = popn!(tx)?;
-    tx.pushv(n.value);
+    let n = popf!(tx)?;
+    tx.pushx(n.value);
     commit!(tx)
 }
 
@@ -269,12 +291,12 @@ pub fn builtin_drop(stack: &mut Stack) -> Result {
 /// If there is an error, the stack is unchanged; the operands are not popped.
 pub fn builtin_into(stack: &mut Stack) -> Result {
     let mut tx = stack.begin();
-    let (a, u) = popnu!(tx)?;
+    let (a, u) = pop_as_fu!(tx)?;
     if let Some(a_unit) = a.unit {
         let b = a_unit.convert(a.value, &u)?;
-        tx.pushn(Number::new(b).with_unit(u));
+        tx.pushf(Number::new(b).with_unit(u));
     } else {
-        tx.pushn(a.with_unit(u));
+        tx.pushf(a.with_unit(u));
     }
     commit!(tx)
 }
@@ -290,8 +312,8 @@ macro_rules! bitwise {
         /// - the items are not integers.
         pub fn $name(stack: &mut Stack) -> Result {
             let mut tx = stack.begin();
-            let (a, b) = popbb!(tx)?;
-            tx.pushb(binary::Integer::new(a.value $op b.value, a.repr));
+            let (a, b) = pop_as_ii!(tx)?;
+            tx.pushi(integer::Integer::new(a.value $op b.value, a.repr));
             commit!(tx)
         }
     };
@@ -310,8 +332,8 @@ bitwise!(builtin_bitwise_xor, ^);
 /// - the item on top of the stack is not an integer.
 pub fn builtin_bitwise_complement(stack: &mut Stack) -> Result {
     let mut tx = stack.begin();
-    let b = popb!(tx)?;
-    tx.pushb(binary::Integer::new(!b.value, b.repr));
+    let x = pop_as_i!(tx)?;
+    tx.pushi(integer::Integer::new(!x.value, x.repr));
     commit!(tx)
 }
 
@@ -325,17 +347,17 @@ macro_rules! binrepr {
         /// - the item on top of the stack is not an integer.
         pub fn $name(stack: &mut Stack) -> Result {
             let mut tx = stack.begin();
-            let b = popb!(tx)?;
-            tx.pushb(b.with_repr($repr));
+            let x = pop_as_i!(tx)?;
+            tx.pushi(x.with_repr($repr));
             commit!(tx)
         }
     };
 }
 
-binrepr!(builtin_bin, binary::Representation::Binary);
-binrepr!(builtin_dec, binary::Representation::Decimal);
-binrepr!(builtin_oct, binary::Representation::Octal);
-binrepr!(builtin_hex, binary::Representation::Hexadecimal);
+binrepr!(builtin_bin, integer::Representation::Binary);
+binrepr!(builtin_dec, integer::Representation::Decimal);
+binrepr!(builtin_oct, integer::Representation::Octal);
+binrepr!(builtin_hex, integer::Representation::Hexadecimal);
 
 /// `( ... a1 ... aN N -- a1 ... aN )` Removes everything from the stack except
 /// the topmost `N` items.
@@ -348,7 +370,7 @@ binrepr!(builtin_hex, binary::Representation::Hexadecimal);
 ///   number.
 pub fn builtin_keep(stack: &mut Stack) -> Result {
     let mut tx = stack.begin();
-    let n = popn!(tx)?;
+    let n = popf!(tx)?;
     if !n.is_dimensionless() {
         return Err(Error::NotDimensionless);
     }
@@ -380,7 +402,6 @@ pub fn builtin_pop(stack: &mut Stack) -> Result {
 /// # Errors
 ///
 /// Returns an error if the stack has fewer than two items.
-#[allow(clippy::missing_panics_doc)]
 pub fn builtin_swap(stack: &mut Stack) -> Result {
     let mut tx = stack.begin();
     let (a, b) = tx.pop2()?;
@@ -393,12 +414,22 @@ pub fn builtin_swap(stack: &mut Stack) -> Result {
 ///
 /// If the item on top of the stack is a dimensionless number, that number is
 /// assigned the unit `u`. Otherwise, `u` is pushed onto the stack.
+#[allow(clippy::missing_panics_doc)]
 pub fn builtin_unit(u: &Unit, stack: &mut Stack) {
     let mut tx = stack.begin();
-    if let Ok(n) = popn!(tx) {
-        if n.is_dimensionless() {
-            tx.pushn(n.with_unit(u.clone()));
-            return tx.commit();
+    if let Ok(x) = popn!(tx) {
+        match x {
+            stack::Item::Float(x) => {
+                if x.is_dimensionless() {
+                    tx.pushf(x.with_unit(u.clone()));
+                    return tx.commit();
+                }
+            }
+            stack::Item::Integer(x) => {
+                tx.pushf(x.as_units_number().with_unit(u.clone()));
+                return tx.commit();
+            }
+            stack::Item::Unit(_) => panic!("invariant wasn't"),
         }
     }
     stack.pushu(u.clone());
@@ -434,7 +465,7 @@ macro_rules! unit {
 macro_rules! constant {
     ($value:expr) => {
         |stack| {
-            stack.pushn($value);
+            stack.pushf($value);
             Ok(())
         }
     };
