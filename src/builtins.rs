@@ -15,7 +15,7 @@
 // You should have received a copy of the GNU General Public License along with
 // calc. If not, see <https://www.gnu.org/licenses/>.
 
-//! Built-in words.
+//! Built-in functions and constants.
 
 use std::collections::HashMap;
 
@@ -27,11 +27,21 @@ use crate::{
 };
 use crate::{commit, popb, popbb, popn, popnn, popnu};
 
+/// An error that occurred while executing a builtin.
+#[derive(Debug, PartialEq)]
 pub enum Error {
     /// A stack error that occurred while executing a builtin.
     Stack(stack::Error),
     /// A units error that occurred while executing a builtin.
     Units(units::Error),
+    /// A number was expected to have a unit but was dimensionless.
+    MissingUnit,
+    /// A number was expected to be dimensionless but had a unit.
+    NotDimensionless,
+    /// A number was expected to be non-negative but was negative.
+    NotNonNegative,
+    /// A number was expected to be whole but had a fractional part.
+    NotWhole,
 }
 
 /// Enables the `?` operator inside implementations of builtins.
@@ -53,6 +63,9 @@ type Result = std::result::Result<(), Error>;
 
 /// A function that implements a builtin.
 pub type Builtin = fn(&mut Stack) -> Result;
+
+/// A table of builtin function names and their implementations.
+pub type Table = HashMap<&'static str, Builtin>;
 
 /// `( a b -- a+b )` Pops two items, adds them, and pushes the result.
 ///
@@ -168,7 +181,7 @@ macro_rules! trig {
                 tx.pushv(n.$fn());
                 commit!(tx)
             } else {
-                Err(Error::Stack(stack::Error::TypeMismatch))
+                Err(Error::MissingUnit)
             }
         }
     };
@@ -197,7 +210,7 @@ macro_rules! inverse_trig {
                 tx.pushn(Number::new(n.value.$fn()).with_unit(RADIAN.as_unit()));
                 commit!(tx)
             } else {
-                Err(Error::Stack(stack::Error::TypeMismatch))
+                Err(Error::NotDimensionless)
             }
         }
     };
@@ -336,8 +349,14 @@ binrepr!(builtin_hex, binary::Representation::Hexadecimal);
 pub fn builtin_keep(stack: &mut Stack) -> Result {
     let mut tx = stack.begin();
     let n = popn!(tx)?;
-    if !n.is_dimensionless() || n.value.fract() != 0.0 || n.value < 0.0 {
-        return Err(Error::Stack(stack::Error::TypeMismatch));
+    if !n.is_dimensionless() {
+        return Err(Error::NotDimensionless);
+    }
+    if n.value.fract() != 0.0 {
+        return Err(Error::NotWhole);
+    }
+    if n.value < 0.0 {
+        return Err(Error::NotNonNegative);
     }
     #[allow(clippy::cast_possible_truncation, clippy::cast_sign_loss)]
     tx.keep(n.value as usize)?;
@@ -385,14 +404,8 @@ pub fn builtin_unit(u: &Unit, stack: &mut Stack) {
     stack.pushu(u.clone());
 }
 
-/// Creates a `Builtin` for a `Base`.
-macro_rules! base {
-    ($b:expr) => {
-        ($b.symbol, anonunit!(&Unit::new(&[&$b], &[]).unwrap()))
-    };
-}
-
-/// Creates a `Builtin` for an anonymous `Unit`.
+/// Creates a builtin for an anonymous `Unit` (a unit without a symbol) that
+/// pushes the unit.
 macro_rules! anonunit {
     ($u:expr) => {
         |stack| {
@@ -402,14 +415,22 @@ macro_rules! anonunit {
     };
 }
 
-/// Creates a `Builtin` for a `Unit`.
+/// Creates a builtin for a `Base` that pushes a unit.
+macro_rules! base {
+    ($b:expr) => {
+        ($b.symbol, anonunit!(&Unit::new(&[&$b], &[]).unwrap()))
+    };
+}
+
+/// Creates a builtin for a named `Unit` (a unit with a symbol) that pushes the
+/// unit.
 macro_rules! unit {
     ($u:expr) => {
         ($u.symbol.as_ref().unwrap().as_str(), anonunit!($u))
     };
 }
 
-/// Creates a `Builtin` for a constant.
+/// Creates a builtin for a constant that pushes the constant.
 macro_rules! constant {
     ($value:expr) => {
         |stack| {
@@ -422,7 +443,7 @@ macro_rules! constant {
 /// Returns a table of builtin names and the functions that implement them.
 #[allow(clippy::missing_panics_doc)]
 #[must_use]
-pub fn table() -> HashMap<&'static str, Builtin> {
+pub fn table() -> Table {
     HashMap::from([
         // Arithmetic
         ("+", builtin_add as Builtin),

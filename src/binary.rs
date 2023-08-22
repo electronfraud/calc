@@ -1,3 +1,5 @@
+//! Integers with specified representations.
+
 #[derive(Clone, Debug, PartialEq)]
 pub enum Representation {
     Binary,

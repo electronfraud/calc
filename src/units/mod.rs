@@ -28,7 +28,7 @@ pub use base::{Base, PhysicalQuantity};
 pub use number::Number;
 pub use unit::Unit;
 
-#[derive(Debug)]
+#[derive(Debug, PartialEq)]
 pub enum Error {
     IncommensurableUnits(Option<Box<Unit>>, Option<Box<Unit>>),
     UninvertableUnits(Box<Unit>),

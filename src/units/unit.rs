@@ -20,7 +20,7 @@ use super::{base::NUM_PHYSICAL_QUANTITIES, Base, Error, PhysicalQuantity};
 use Error::*;
 
 /// A unit that may measure a base quantity or a derived quantity.
-#[derive(Clone, Debug)]
+#[derive(Clone, Debug, PartialEq)]
 pub struct Unit {
     /// Symbolic representation of the unit
     pub symbol: Option<String>,

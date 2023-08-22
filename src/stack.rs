@@ -16,6 +16,47 @@
 // calc. If not, see <https://www.gnu.org/licenses/>.
 
 //! The stack.
+//!
+//!
+//!
+//! # Examples
+//!
+//! Stacks can be used in transactions so that if an operation on a popped
+//! value fails, the transaction can be rolled back and the value remains on
+//! the stack. Transactions are automatically rolled back if they fall out of
+//! scope without being committed.
+//!
+//! ```
+//! use calc::stack::{Error, Item::Number, Stack};
+//! use calc::{commit, popnn};
+//!
+//! fn div(stack: &mut Stack) -> Result<(), Error> {
+//!     let mut tx = stack.begin();
+//!
+//!     let (a, b) = popnn!(tx)?;
+//!
+//!     if b.value == 0.0 {
+//!         return Err(Error::TypeMismatch);
+//!     }
+//!
+//!     tx.pushv(a.value / b.value);
+//!     commit!(tx)
+//! }
+//!
+//! let mut stack = Stack::new();
+//!
+//! stack.pushv(1.0);
+//! stack.pushv(0.0);
+//!
+//! assert!(div(&mut stack).is_err());
+//! assert_eq!(stack.height(), 2);
+//!
+//! stack.pop();
+//! stack.pushv(2.0);
+//!
+//! assert!(div(&mut stack).is_ok());
+//! assert_eq!(stack.height(), 1);
+//! ```
 
 use crate::{binary, units};
 
@@ -36,46 +77,8 @@ pub enum Item {
     BinInt(binary::Integer),
 }
 
-/// A LIFO collection of numbers and units.
+/// A LIFO collection of typed objects.
 ///
-/// # Examples
-///
-/// Stacks can be used in transactions so that if an operation on a popped
-/// value fails, the transaction can be rolled back and the value remains on
-/// the stack. Transactions are automatically rolled back if they fall out of
-/// scope without being committed.
-///
-/// ```
-/// use calc::stack::{Error, Item::Number, Stack};
-/// use calc::{commit, popnn};
-///
-/// fn div(stack: &mut Stack) -> Result<(), Error> {
-///     let mut tx = stack.begin();
-///
-///     let (a, b) = popnn!(tx)?;
-///
-///     if b.value == 0.0 {
-///         return Err(Error::TypeMismatch);
-///     }
-///
-///     tx.pushv(a.value / b.value);
-///     commit!(tx)
-/// }
-///
-/// let mut stack = Stack::new();
-///
-/// stack.pushv(1.0);
-/// stack.pushv(0.0);
-///
-/// assert!(div(&mut stack).is_err());
-/// assert_eq!(stack.height(), 2);
-///
-/// stack.pop();
-/// stack.pushv(2.0);
-///
-/// assert!(div(&mut stack).is_ok());
-/// assert_eq!(stack.height(), 1);
-/// ```
 pub struct Stack(Vec<Item>);
 
 impl Stack {
@@ -133,7 +136,7 @@ impl Stack {
         self.push(Item::BinInt(b));
     }
 
-    /// Start a transaction.
+    /// Starts a transaction.
     pub fn begin(&mut self) -> Transaction {
         let stack_remaining = self.height();
         Transaction {
@@ -173,9 +176,12 @@ impl Transaction<'_> {
 
     /// Pops an item off the stack.
     ///
+    /// Use the `popb`, `popn`, and `popu` macros to pop an item and perform
+    /// type-checking.
+    ///
     /// # Errors
     ///
-    /// Returns an error if there are fewer than two items on the stack.
+    /// Returns an error if the stack is empty.
     pub fn pop(&mut self) -> Result<Item, Error> {
         if self.is_empty() {
             Err(Error::Underflow)
@@ -188,6 +194,9 @@ impl Transaction<'_> {
     }
 
     /// Pops two items off the stack and returns them.
+    ///
+    /// Use the `popbb`, `popnn`, and `popnu` macros to pop items and perform
+    /// type-checking.
     ///
     /// # Errors
     ///
@@ -259,6 +268,9 @@ impl Transaction<'_> {
 
     /// Commits all pops and pushes performed during this transaction to the
     /// stack and ends the transaction.
+    ///
+    /// Use the `commit!` macro for a convenient way to commit a transaction
+    /// and produce an `Ok(())`.
     pub fn commit(&mut self) {
         self.stack.0.truncate(self.stack_remaining);
         self.stack.0.append(&mut self.pushed);

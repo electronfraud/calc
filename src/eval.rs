@@ -1,22 +1,28 @@
-use std::collections::HashMap;
+//! Input evaluation.
+
 use std::string::ToString;
 
-use crate::{binary, builtins, builtins::Builtin, stack, stack::Stack, units};
-
-/// A table of builtin function names and their implementations.
-type BuiltinsTable = HashMap<&'static str, Builtin>;
+use crate::{binary, builtins, stack, stack::Stack};
 
 /// An evaluation context.
 pub struct Context {
     stack: Stack,
-    builtins: BuiltinsTable,
+    builtins: builtins::Table,
 }
 
 /// The result of an evaluation.
 #[derive(Debug, PartialEq)]
-pub enum Result {
+pub enum Status {
     Ok,
     Exit,
+    Err { error: Error, word: String },
+}
+
+/// An error that occurred during evaluation.
+#[derive(Debug, PartialEq)]
+pub enum Error {
+    Builtins(builtins::Error),
+    UnknownWord,
 }
 
 impl Context {
@@ -32,22 +38,22 @@ impl Context {
 
     /// Evaluates a line of input. Returns false if `exit` or `q` are
     /// evaluated.
-    pub fn eval(&mut self, input: &str) -> Result {
-        for token in tokenize(input) {
+    pub fn eval(&mut self, input: &str) -> Status {
+        for token in Token::split(input) {
             match token {
-                Token::Number(n) => self.eval_number(n),
                 Token::BinInt(b) => self.eval_bin_int(b),
+                Token::Number(n) => self.eval_number(n),
                 Token::Word(w) => {
                     if w == "exit" || w == "q" {
-                        return Result::Exit;
+                        return Status::Exit;
                     }
-                    if !self.eval_word(w.as_str()) {
-                        break;
+                    if let Err(e) = self.eval_word(w.as_str()) {
+                        return Status::Err { error: e, word: w };
                     }
                 }
             };
         }
-        Result::Ok
+        Status::Ok
     }
 
     /// Evaluates a `binary::Integer`, i.e., pushes the integer onto the stack.
@@ -65,33 +71,16 @@ impl Context {
     /// builtin is found, prints an error and returns false.
     ///
     /// Returns `true` if evaluation succeeded.
-    #[must_use]
-    fn eval_word(&mut self, w: &str) -> bool {
+    fn eval_word(&mut self, w: &str) -> Result<(), Error> {
         if let Some(f) = self.builtins.get(w) {
             if let Err(e) = f(&mut self.stack) {
-                print!("{w}: ");
-                match e {
-                    builtins::Error::Stack(e) => match e {
-                        stack::Error::TypeMismatch => println!("type mismatch"),
-                        stack::Error::Underflow => println!("stack underflow"),
-                    },
-                    builtins::Error::Units(e) => match e {
-                        units::Error::IncommensurableUnits(_, _) => {
-                            println!("incommensurable units")
-                        }
-                        units::Error::UninvertableUnits(u) => println!("{u} can't be inverted"),
-                        units::Error::NonzeroZeroPoint(b) => {
-                            println!("operation would place {b} in a nonsensical position");
-                        }
-                    },
-                };
-                return false;
+                Err(Error::Builtins(e))
+            } else {
+                Ok(())
             }
-            return true;
+        } else {
+            Err(Error::UnknownWord)
         }
-
-        println!("{w}: unknown word");
-        false
     }
 
     /// Returns a REPL prompt containing the elements in the stack, e.g. "(1 2) ".
@@ -135,19 +124,19 @@ enum Token {
     Word(String),
 }
 
-/// Converts a line of user input into a sequence of tokens.
-fn tokenize(s: &str) -> Vec<Token> {
-    let mut tokens: Vec<Token> = Vec::new();
-
-    for word in s.split_ascii_whitespace() {
-        if let Some(b) = binary::Integer::parse(word) {
-            tokens.push(Token::BinInt(b));
-        } else if let Ok(n) = word.parse::<f64>() {
-            tokens.push(Token::Number(n));
-        } else {
-            tokens.push(Token::Word(String::from(word)));
+impl Token {
+    /// Splits a string into a sequence of tokens.
+    fn split(s: &str) -> Vec<Token> {
+        let mut tokens: Vec<Token> = Vec::new();
+        for word in s.split_ascii_whitespace() {
+            if let Some(b) = binary::Integer::parse(word) {
+                tokens.push(Token::BinInt(b));
+            } else if let Ok(n) = word.parse::<f64>() {
+                tokens.push(Token::Number(n));
+            } else {
+                tokens.push(Token::Word(String::from(word)));
+            }
         }
+        tokens
     }
-
-    tokens
 }

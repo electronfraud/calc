@@ -18,7 +18,7 @@
 use rustyline as rl;
 use rustyline::error::ReadlineError;
 
-use calc::eval;
+use calc::{builtins, eval, stack, units};
 
 /// Autocompletion helper.
 struct Completer {
@@ -63,6 +63,33 @@ impl rl::completion::Completer for Completer {
     }
 }
 
+/// Prints an error message when an evaluation error occurs.
+fn print_error(error: &eval::Error, word: &String) {
+    print!("{word}: ");
+    match error {
+        eval::Error::Builtins(e) => match e {
+            builtins::Error::Stack(e) => match e {
+                stack::Error::TypeMismatch => println!("type mismatch"),
+                stack::Error::Underflow => println!("stack underflow"),
+            },
+            builtins::Error::Units(e) => match e {
+                units::Error::IncommensurableUnits(_, _) => {
+                    println!("incommensurable units");
+                }
+                units::Error::UninvertableUnits(u) => println!("{u} can't be inverted"),
+                units::Error::NonzeroZeroPoint(b) => {
+                    println!("operation would place {b} in a nonsensical position");
+                }
+            },
+            builtins::Error::MissingUnit => println!("missing unit"),
+            builtins::Error::NotDimensionless => println!("number must be dimensionless"),
+            builtins::Error::NotNonNegative => println!("number must be non-negative"),
+            builtins::Error::NotWhole => println!("number must be whole"),
+        },
+        eval::Error::UnknownWord => println!("unknown word"),
+    }
+}
+
 fn main() -> Result<(), ReadlineError> {
     // Create the evaluation context.
     let mut ctx = eval::Context::new();
@@ -103,8 +130,10 @@ fn main() -> Result<(), ReadlineError> {
         history_path.as_ref().map(|path| rl.append_history(&path));
 
         // Evaluate
-        if ctx.eval(input.as_str()) == eval::Result::Exit {
-            return Ok(());
+        match ctx.eval(input.as_str()) {
+            eval::Status::Ok => { /* do nothing */ }
+            eval::Status::Err { error, word } => print_error(&error, &word),
+            eval::Status::Exit => return Ok(()),
         }
     }
 }
