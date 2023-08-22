@@ -24,7 +24,7 @@ use crate::{
     integer, stack,
     stack::Stack,
     units,
-    units::{Number, Unit, RADIAN},
+    units::{Number, Unit, JOULE, METER, RADIAN, SECOND},
 };
 
 /// An error that occurred while executing a builtin.
@@ -461,11 +461,21 @@ macro_rules! unit {
     };
 }
 
-/// Creates a builtin for a constant that pushes the constant.
-macro_rules! constant {
+/// Creates a builtin for a dimensionless constant that pushes the constant.
+macro_rules! constx {
     ($value:expr) => {
         |stack| {
-            stack.pushf($value);
+            stack.pushx($value);
+            Ok(())
+        }
+    };
+}
+
+/// Creates a builtin for a constant with units that pushes the constant.
+macro_rules! constf {
+    ($value:expr, $unit:expr) => {
+        |stack| {
+            stack.pushf(Number::new($value).with_unit(($unit).unwrap()));
             Ok(())
         }
     };
@@ -476,8 +486,14 @@ macro_rules! constant {
 #[must_use]
 pub fn table() -> Table {
     HashMap::from([
+        // Constants
+        ("c", constf!(299_792_458.0, &METER / &SECOND) as Builtin),
+        ("e", constx!(std::f64::consts::E)),
+        ("h", constf!(6.626_070_15e-34, &*JOULE * &SECOND)),
+        ("hbar", constf!(1.054_571_817e-34, &*JOULE * &SECOND)),
+        ("pi", constx!(std::f64::consts::PI)),
         // Arithmetic
-        ("+", builtin_add as Builtin),
+        ("+", builtin_add),
         ("-", builtin_sub),
         ("*", builtin_mul),
         ("/", builtin_div),
@@ -488,32 +504,6 @@ pub fn table() -> Table {
         ("asin", builtin_asin),
         ("acos", builtin_acos),
         ("atan", builtin_atan),
-        // Constants
-        (
-            "c",
-            constant!(
-                Number::new(299_792_458.0).with_unit((&units::METER / &units::SECOND).unwrap())
-            ),
-        ),
-        ("e", constant!(Number::new(std::f64::consts::E))),
-        (
-            "h",
-            constant!(
-                Number::new(6.626_070_15e-34).with_unit((&*units::JOULE * &units::SECOND).unwrap())
-            ),
-        ),
-        (
-            "hbar",
-            constant!(Number::new(1.054_571_817e-34)
-                .with_unit((&*units::JOULE * &units::SECOND).unwrap())),
-        ),
-        ("pi", constant!(Number::new(std::f64::consts::PI))),
-        // Stack
-        ("clear", builtin_clear),
-        ("dup", builtin_dup),
-        ("keep", builtin_keep),
-        ("pop", builtin_pop),
-        ("swap", builtin_swap),
         // Unit Conversion
         ("drop", builtin_drop),
         ("into", builtin_into),
@@ -526,6 +516,12 @@ pub fn table() -> Table {
         ("oct", builtin_oct),
         ("dec", builtin_dec),
         ("hex", builtin_hex),
+        // Stack Manipulation
+        ("clear", builtin_clear),
+        ("dup", builtin_dup),
+        ("keep", builtin_keep),
+        ("pop", builtin_pop),
+        ("swap", builtin_swap),
         // Units
         base!(units::SECOND),
         base!(units::METER),

@@ -116,11 +116,6 @@ impl Stack {
         self.0.pop()
     }
 
-    /// Pushes an item onto the stack.
-    pub fn push(&mut self, item: Item) {
-        self.0.push(item);
-    }
-
     /// Pushes a floating-point number with optional units onto the stack.
     pub fn pushf(&mut self, x: units::Number) {
         self.0.push(Item::Float(x));
@@ -138,7 +133,7 @@ impl Stack {
 
     /// Pushes an integer onto the stack.
     pub fn pushi(&mut self, x: integer::Integer) {
-        self.push(Item::Integer(x));
+        self.0.push(Item::Integer(x));
     }
 
     /// Starts a transaction.
@@ -474,7 +469,11 @@ impl<'a> IntoIterator for &'a Stack {
 
 #[cfg(test)]
 mod tests {
-    use crate::stack::Stack;
+    use crate::{
+        integer,
+        stack::{Item, Stack},
+        units,
+    };
 
     #[test]
     fn height() {
@@ -502,5 +501,118 @@ mod tests {
         assert!(!s.is_empty());
         s.pop();
         assert!(s.is_empty());
+    }
+
+    #[test]
+    fn clear() {
+        let mut s = Stack::new();
+        s.clear();
+        assert_eq!(s.height(), 0);
+        s.pushf(units::Number::new(5.4));
+        s.pushu(units::AMPERE.as_unit());
+        s.pushx(1.2);
+        s.pushi(integer::Integer::hex(3));
+        assert_eq!(s.height(), 4);
+        s.clear();
+        assert_eq!(s.height(), 0);
+    }
+
+    #[test]
+    fn transaction_rollback() {
+        let mut s = Stack::new();
+
+        let f = units::Number::new(1.2);
+        let i = integer::Integer::dec(10);
+        s.pushf(f.clone());
+        s.pushi(i.clone());
+
+        {
+            let mut tx = s.begin();
+            let _ = tx.pop();
+            tx.pushx(3.4);
+            tx.pushu(units::CANDELA.as_unit());
+            assert_eq!(tx.height(), 3);
+        }
+
+        assert_eq!(s.height(), 2);
+        match s.pop().unwrap() {
+            Item::Integer(this_i) => assert_eq!(this_i, i),
+            _ => panic!("expected Item::Integer"),
+        }
+        match s.pop().unwrap() {
+            Item::Float(this_f) => {
+                assert_eq!(this_f.value, f.value);
+                assert_eq!(this_f.unit, f.unit);
+            }
+            _ => panic!("expected Item::Float"),
+        }
+    }
+
+    #[test]
+    fn transaction_isolation() {
+        let mut s = Stack::new();
+
+        let f = units::Number::new(1.2);
+        let i = integer::Integer::dec(10);
+        s.pushf(f.clone());
+        s.pushi(i.clone());
+
+        let mut tx = s.begin();
+        let _ = tx.pop();
+        tx.pushx(3.4);
+        tx.pushu(units::CANDELA.as_unit());
+        assert_eq!(tx.height(), 3);
+
+        assert_eq!(s.height(), 2);
+        match s.pop().unwrap() {
+            Item::Integer(this_i) => assert_eq!(this_i, i),
+            _ => panic!("expected Item::Integer"),
+        }
+        match s.pop().unwrap() {
+            Item::Float(this_f) => {
+                assert_eq!(this_f.value, f.value);
+                assert_eq!(this_f.unit, f.unit);
+            }
+            _ => panic!("expected Item::Float"),
+        }
+    }
+
+    #[test]
+    fn transaction_commit() {
+        let mut s = Stack::new();
+
+        let f = units::Number::new(1.2);
+        let i = integer::Integer::dec(10);
+        let u = units::CANDELA.as_unit();
+        s.pushf(f.clone());
+        s.pushi(i.clone());
+
+        {
+            let mut tx = s.begin();
+            let _ = tx.pop();
+            tx.pushx(3.4);
+            tx.pushu(u.clone());
+            tx.commit();
+        }
+
+        assert_eq!(s.height(), 3);
+        match s.pop().unwrap() {
+            Item::Unit(this_u) => assert_eq!(this_u, u),
+            _ => panic!("expected Item::Unit"),
+        }
+        match s.pop().unwrap() {
+            Item::Float(this_f) => {
+                assert_eq!(this_f.value, 3.4);
+                assert_eq!(this_f.unit, None);
+            }
+            _ => panic!("expected Item::Float"),
+        }
+        match s.pop().unwrap() {
+            Item::Float(this_f) => {
+                assert_eq!(this_f.value, f.value);
+                assert_eq!(this_f.unit, f.unit);
+            }
+            _ => panic!("expected Item::Float"),
+        }
     }
 }
