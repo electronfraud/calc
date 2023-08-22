@@ -50,11 +50,18 @@ impl Number {
     }
 }
 
+/// Helper for `std::fmt::Display` implementation.
+fn should_use_exponent_format(x: f64) -> bool {
+    x.is_finite() && x != 0.0 && (x.abs() < 0.001 || x.abs() >= 10_000_000_000.0)
+}
+
 impl std::fmt::Display for Number {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> Result<(), std::fmt::Error> {
-        let value = if (self.value.abs() < 0.001 && self.value != 0.0)
-            || self.value.abs() >= 10_000_000_000.0
-        {
+        // Use exponent format for very small and very large numbers. Use
+        // decimal format for everything else (including NaNs and infinites).
+        let value = if should_use_exponent_format(self.value) {
+            // Use exponent format, but trim trailing zeroes. Then, delete the
+            // decimal point if the entire fractional component was zeroes.
             let e = format!("{:.6e}", self.value);
             let halves: Vec<&str> = e.splitn(2, 'e').collect();
             halves[0]
@@ -64,12 +71,15 @@ impl std::fmt::Display for Number {
                 + "e"
                 + halves[1]
         } else {
+            // Use decimal format, but trim trailing zeroes. Then, delete the
+            // decimal point if the entire fractional component was zeroes.
             format!("{:.6}", self.value)
                 .trim_end_matches('0')
                 .trim_end_matches('.')
                 .to_string()
         };
 
+        // Add the number's unit, if it has one.
         #[allow(clippy::map_unwrap_or)] // can't because of `f` borrow
         self.unit
             .as_ref()
