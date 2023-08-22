@@ -260,7 +260,7 @@ This is a list of all available commands.
 | Name  | Description                        |
 |-------|------------------------------------|
 | `&`   | Bitwise AND.                       |
-| `|`   | Bitwise OR.                        |
+| `\|`   | Bitwise OR.                       |
 | `^`   | Bitwise XOR.                       |
 | `~`   | Bitwise complement.                |
 | `hex` | Display an integer in hexadecimal. |
