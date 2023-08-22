@@ -15,7 +15,7 @@
 // You should have received a copy of the GNU General Public License along with
 // calc. If not, see <https://www.gnu.org/licenses/>.
 
-use super::{base::NUM_PHYSICAL_QUANTITIES, Base, Error, PhysicalQuantity};
+use super::{base::NUM_PHYSICAL_QUANTITIES, Base, Error};
 #[allow(clippy::enum_glob_use)]
 use Error::*;
 
@@ -147,7 +147,8 @@ impl Unit {
     /// Returns an error if the unit has a zero point. Inversion of these units
     /// is nonsensical.
     pub fn inverse(&self) -> Result<Self, Error> {
-        if !self.numer.is_empty() && self.numer[0].zero == Some(0.0) {
+        if !self.numer.is_empty() && self.numer[0].zero.is_some() && self.numer[0].zero != Some(0.0)
+        {
             return Err(UninvertableUnits(Box::new(self.clone())));
         }
         Self::new(self.denom.as_slice(), self.numer.as_slice())
@@ -207,17 +208,6 @@ impl Unit {
         // Otherwise both units must have a zero, or both units must not have a
         // zero.
         (a.is_some() && b.is_some()) || (a.is_none() && b.is_none())
-    }
-
-    /// Returns true if this unit has only one base, the base's exponent is +1,
-    /// and the base measures the specified physical quantity.
-    #[must_use]
-    pub fn measures(&self, q: PhysicalQuantity) -> bool {
-        if self.numer.len() != 1 || !self.denom.is_empty() {
-            return false;
-        }
-
-        self.numer[0].physq == q
     }
 
     /// Returns a new `Unit` mathematically identical to this one but without
@@ -321,7 +311,7 @@ impl std::fmt::Display for Unit {
             (Some(pos), Some(neg)) => write!(fmt, "{pos}⋅{neg}"),
             (Some(pos), None) => write!(fmt, "{pos}"),
             (None, Some(neg)) => write!(fmt, "{neg}"),
-            (None, None) => Ok(()),
+            (None, None) => panic!("Unit with empty `numer` and `denom`"),
         }
     }
 }
@@ -400,11 +390,13 @@ impl std::ops::Div<&'static Base> for &Unit {
 
 #[cfg(test)]
 mod tests {
+    use approx::assert_relative_eq;
+
+    use crate::units::Unit;
     use crate::units::{
-        Unit, AMPERE, DEG_CELSIUS, DEG_FAHRENHEIT, FOOT, HOUR, KELVIN, KILOGRAM, METER, MILE,
+        AMPERE, DEG_CELSIUS, DEG_FAHRENHEIT, FOOT, HOUR, KELVIN, KILOGRAM, METER, MILE,
         NAUTICAL_MILE, RANKINE, SECOND, TEMP_CELSIUS, TEMP_FAHRENHEIT,
     };
-    use approx::assert_relative_eq;
 
     #[test]
     fn unit_display() {
@@ -418,15 +410,26 @@ mod tests {
             denom: vec![&SECOND, &SECOND],
         };
         assert_eq!(joule.to_string(), "J");
+
+        let joule = Unit {
+            symbol: None,
+            numer: vec![&KILOGRAM, &METER, &METER],
+            denom: vec![&SECOND, &SECOND],
+        };
+        assert_ne!(joule.to_string(), "J");
+        assert_eq!(joule.with_symbol("J").to_string(), "J");
     }
 
     #[test]
     fn unit_display_exponents() {
         let u = (((&METER * &METER).unwrap() / &AMPERE).unwrap() / &SECOND).unwrap();
         assert_eq!(u.to_string(), "m²⋅A⁻¹⋅s⁻¹");
-
         let u = (&u / &SECOND).unwrap();
         assert_eq!(u.to_string(), "m²⋅A⁻¹⋅s⁻²");
+        let u = Unit::new(&[&SECOND, &SECOND, &AMPERE], &[]).unwrap();
+        assert_eq!(u.to_string(), "s²⋅A");
+        let u = Unit::new(&[], &[&SECOND, &SECOND, &AMPERE]).unwrap();
+        assert_eq!(u.to_string(), "s⁻²⋅A⁻¹");
     }
 
     #[test]
@@ -646,5 +649,38 @@ mod tests {
         let a = Unit::new(&[&RANKINE], &[]).unwrap();
         let b = Unit::new(&[&RANKINE], &[]).unwrap();
         assert_eq!(a.convert(1.0, &b).unwrap(), 1.0);
+    }
+
+    #[test]
+    fn temp_in_derived_unit() {
+        let r = Unit::new(&[&TEMP_CELSIUS, &SECOND], &[]);
+        assert!(r.is_err());
+        let r = Unit::new(&[&TEMP_CELSIUS], &[&SECOND]);
+        assert!(r.is_err());
+        let r = Unit::new(&[], &[&TEMP_CELSIUS]);
+        assert!(r.is_err());
+        let r = Unit::new(&[&KELVIN, &SECOND], &[]);
+        assert!(r.is_ok());
+        let r = Unit::new(&[&KELVIN], &[&SECOND]);
+        assert!(r.is_ok());
+        let r = Unit::new(&[], &[&KELVIN]);
+        assert!(r.is_ok());
+    }
+
+    #[test]
+    fn inverse() {
+        let u = Unit::new(&[&KILOGRAM], &[&SECOND, &SECOND, &AMPERE])
+            .unwrap()
+            .inverse()
+            .unwrap();
+        assert_eq!(
+            u,
+            Unit::new(&[&SECOND, &SECOND, &AMPERE], &[&KILOGRAM]).unwrap()
+        );
+
+        let u = Unit::new(&[&TEMP_FAHRENHEIT], &[]).unwrap();
+        assert!(u.inverse().is_err());
+        let u = Unit::new(&[&KELVIN], &[]).unwrap();
+        assert!(u.inverse().is_ok());
     }
 }
