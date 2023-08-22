@@ -9,6 +9,7 @@ A terminal-based, units-aware, RPN calculator.
 * [How to Use](#how-to-use)
   * [The Stack](#the-stack)
   * [Units](#units)
+    * [Temperature](#temperature)
   * [Readline](#readline)
 * [Reference](#reference)
   * [Constants](#constants)
@@ -77,7 +78,7 @@ physical phenomenon (length, time, temperature, etc.). When multiplying
 and dividing, `calc` computes the resulting units.
 
 Numbers on the stack are assigned units by entering the name of the
-unit. Numbers with units are displayed in square brackets along with.
+unit. Numbers with units are displayed in square brackets along with
 their unit. For example, to push a value of two inches:
 
 ```
@@ -117,17 +118,81 @@ produces the average speed in meters per second:
 
 ```
 () 100 m 9.58 s /
-([10.438413361169102 m⋅s⁻¹])
+([10.438413 m⋅s⁻¹])
 ```
 
 You could then convert that into miles per hour:
 
 ```
 () 100 m 9.58 s /
-([10.438413361169102 m⋅s⁻¹]) mi hr /
-([10.438413361169102 m⋅s⁻¹] mi⋅hr⁻¹) into
-([23.35006567906474 mi⋅hr⁻¹])
+([10.438413 m⋅s⁻¹]) mi hr /
+([10.438413 m⋅s⁻¹] mi⋅hr⁻¹) into
+([23.350066 mi⋅hr⁻¹])
 ```
+
+#### Temperature
+
+Temperatures pose some difficulties when it comes to unit conversion because
+the conversion depends on whether you mean "the temperature (outside, of
+this person, of the sun, etc.) is X degrees" or "a difference of X degrees."
+For the first kind of temperature, use `tempC` or `tempF` units; for
+differences in temperature, use `degC` or `degF` units. `K` (Kelvin) and
+`R` (Rankine) can be used for either because they are based on absolute
+zero.
+
+Both types of temperature unit can be converted to and from `K` and `R`,
+but `temp` units can't be converted to `deg` units, and vice versa. Also,
+`deg` units can be mixed with other kinds of units (e.g. `degC` per `s`)
+but `temp` units can't (`tempC` per `s` is nonsensical).
+
+For example, if the temperature outside somewhere in the United States is
+78 degrees Fahrenheit and you want to know what that is in Celsius, you
+would do:
+
+```
+() 78 tempF tempC into
+([25.555556 tempC])
+```
+
+But if a red-hot nickel ball cooled by 78 degrees Fahrenheit and you
+wanted to know how much its temperature had changed in degrees Celsius,
+you would do:
+
+```
+() 78 degF degC into
+([43.333333 degC])
+```
+
+### Radices
+
+In addition to base-10 real numbers, you can enter integers in hexadecimal,
+octal, and binary. You can also display integers in these bases and use
+bitwise operators on them. For example:
+
+```
+() 0xeb9f
+(0xeb9f) 0b10001101
+(0xeb9f 0b10001101) &
+(0x8d)
+```
+
+To change an integer's display format, enter `hex`, `dec`, `oct`, or `bin`:
+
+```
+(0x8d) oct
+(0215) bin
+(0b10001101) dec
+(141)
+```
+
+The following formats are accepted:
+
+| Radix | Prefixes        | Separator | Example               |
+|-------|-----------------|-----------|-----------------------|
+| 16    | `0x`, `0X`, `$` | `_`       | `0x12345678_abcdef01` |
+| 10    | None            | `,`       | `123,456,789,012`     |
+| 8     | `0`, `0o`, `0O` | `_`       | `0123_456_701`        |
+| 2     | `0b`, `0B`      | `_`       | `0b10101010_10101010` |
 
 ### Readline
 
@@ -174,14 +239,14 @@ This is a list of all available commands.
 
 #### Trigonometry
 
-| Name    | Description  |
-|---------|--------------|
-| `sin`   | Sine.        |
-| `cos`   | Cosine.      |
-| `tan`   | Tangent.     |
-| `asin`  | Arc sine.    |
-| `acos`  | Arc cosine.  |
-| `atan`  | Arc tangent. |
+| Name    | Description                                       |
+|---------|---------------------------------------------------|
+| `sin`   | Sine. Accepts any angle unit.                     |
+| `cos`   | Cosine. Accepts any angle unit.                   |
+| `tan`   | Tangent. Accepts any angle unit.                  |
+| `asin`  | Arc sine. Result has units of `rad` (radians).    |
+| `acos`  | Arc cosine. Result has units of `rad` (radians).  |
+| `atan`  | Arc tangent. Result has units of `rad` (radians). |
 
 #### Unit Conversion
 
@@ -254,10 +319,9 @@ with this program. If not, see <https://www.gnu.org/licenses/>.
 ### Future Work
 
 - Basics
-  - Integer bases (hexadecimal, binary, octal), base conversions, and
-    bitwise operations
   - Exponent operator
   - Additional units
+  - Complex numbers
 - Conveniences
   - Adjustable output precision
   - Inline help
