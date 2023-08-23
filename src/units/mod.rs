@@ -33,6 +33,11 @@ pub enum Error {
     IncommensurableUnits(Option<Box<Unit>>, Option<Box<Unit>>),
     UninvertableUnits(Box<Unit>),
     NonzeroZeroPoint(&'static Base),
+    ExponentHasUnits,
+    ExponentNotAnInteger,
+    DegreeHasUnits,
+    DegreeNotAnInteger,
+    UnitNotDivisible,
 }
 
 #[allow(clippy::enum_glob_use)]

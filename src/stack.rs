@@ -312,6 +312,29 @@ macro_rules! pop_as_f {
     };
 }
 
+/// Pops two numeric items off the stack. When successful, the results will
+/// alwayus be fractional components, even if any of the popped items was an
+/// integer.
+#[macro_export]
+macro_rules! pop_as_ff {
+    ($stacklike: ident) => {
+        $stacklike.pop2().and_then(|items| match items {
+            ($crate::stack::Item::Float(a), $crate::stack::Item::Float(b)) => Ok((a, b)),
+            ($crate::stack::Item::Float(a), $crate::stack::Item::Integer(b)) => {
+                Ok((a, units::Number::new(b.value as f64)))
+            }
+            ($crate::stack::Item::Integer(a), $crate::stack::Item::Float(b)) => {
+                Ok((units::Number::new(a.value as f64), b))
+            }
+            ($crate::stack::Item::Integer(a), $crate::stack::Item::Integer(b)) => Ok((
+                units::Number::new(a.value as f64),
+                units::Number::new(b.value as f64),
+            )),
+            _ => Err($crate::stack::Error::TypeMismatch),
+        })
+    };
+}
+
 /// Pops a numeric item and a unit off the stack. When successful, the numeric
 /// item will always be a `units::Number`, even if the popped item was an
 /// integer.

@@ -50,6 +50,10 @@ pub struct Base {
     /// that equals zero in the corresponding SI base unit. For example, for
     /// temperature Celsius this field is -273.15. For degrees Celsius, this
     /// field is `None`.
+    // TODO: the meaning of this field should be changed to:
+    // - Some(0.0): default
+    // - Some(n|n != 0.0): non-ratiometric
+    // - None: interval
     pub zero: Option<f64>,
 }
 

@@ -230,12 +230,17 @@ This is a list of all available commands.
 
 #### Arithmetic
 
-| Name    | Description     |
-|---------|-----------------|
-| `+`     | Addition.       |
-| `-`     | Subtraction.    |
-| `*`     | Multiplication. |
-| `/`     | Division.       |
+| Name    | Description                        |
+|---------|------------------------------------|
+| `+`     | Addition.                          |
+| `-`     | Subtraction.                       |
+| `*`     | Multiplication.                    |
+| `/`     | Division.                          |
+| `**`    | Raises a number to a power.        |
+| `exp`   | Raises e to a power.               |
+| `sqrt`  | Square root.                       |
+| `cbrt`  | Cube root.                         |
+| `/**`   | Root of specified degree.          |
 
 #### Trigonometry
 
@@ -319,7 +324,7 @@ with this program. If not, see <https://www.gnu.org/licenses/>.
 ### Future Work
 
 - Basics
-  - Exponent operator
+  - Logarithms
   - Additional units
   - Complex numbers
 - Conveniences

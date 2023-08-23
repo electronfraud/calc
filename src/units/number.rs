@@ -17,7 +17,9 @@
 
 //! Arithmetic with units.
 
-use super::{Error, Unit};
+use itertools::{any, Itertools};
+
+use super::{Base, Error, Unit};
 
 /// A number with an optional unit.
 #[derive(Clone, Debug)]
@@ -48,6 +50,136 @@ impl Number {
     pub fn is_dimensionless(&self) -> bool {
         self.unit.is_none()
     }
+
+    /// Returns true if this number has no fractional part.
+    #[must_use]
+    pub fn is_whole(&self) -> bool {
+        self.value.fract() == 0.0
+    }
+
+    /// Raises this number to the power of another number.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if:
+    /// - the other number is not dimensionless; or,
+    /// - this number has units and the other number is not whole.
+    pub fn pow(&self, other: &Number) -> Result<Number, Error> {
+        if !other.is_dimensionless() {
+            Err(Error::ExponentHasUnits)
+        } else if self.is_dimensionless() {
+            Ok(Number::new(self.value.powf(other.value)))
+        } else if !other.is_whole() {
+            Err(Error::ExponentNotAnInteger)
+        } else if other.value == 0.0 {
+            Ok(Number::new(1.0))
+        } else {
+            let mut numer: Vec<&Base> = Vec::new();
+            let mut denom: Vec<&Base> = Vec::new();
+
+            // this will always succeed but i'd rather not use unwrap() and
+            // have to allow missing panics docs in case a real panic gets
+            // added later
+            if let Some(u) = self.unit.as_ref() {
+                // allowed because we tested for wholeness and use abs()
+                #[allow(clippy::cast_possible_truncation, clippy::cast_sign_loss)]
+                for _ in 0..(other.value.abs() as usize) {
+                    numer.extend_from_slice(u.numer());
+                    denom.extend_from_slice(u.denom());
+                }
+            }
+
+            if other.value < 0.0 {
+                (numer, denom) = (denom, numer);
+            }
+
+            Unit::new(&numer, &denom)
+                .map(|u| Number::new(self.value.powf(other.value)).with_unit(u))
+        }
+    }
+
+    /// Finds the Nth root of this number.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if:
+    /// - the other number is not dimensionless;
+    /// - this number has units and the other number is not whole; or,
+    /// - this number has units that are not evenly divisible by N.
+    pub fn root(&self, other: &Number) -> Result<Number, Error> {
+        if !other.is_dimensionless() {
+            Err(Error::DegreeHasUnits)
+        } else if self.is_dimensionless() {
+            Ok(Number::new(self.value.powf(1.0 / other.value)))
+        } else if !other.is_whole() {
+            Err(Error::DegreeNotAnInteger)
+        } else {
+            let mut numer: Vec<&Base> = Vec::new();
+            let mut denom: Vec<&Base> = Vec::new();
+            #[allow(clippy::cast_possible_truncation)] // already tested for wholeness
+            let degree = other.value as isize;
+            let abs_degree = degree.unsigned_abs();
+
+            // this will always succeed but i'd rather not use unwrap() and
+            // have to allow missing panics docs in case a real panic gets
+            // added later
+            if let Some(u) = &self.unit {
+                let (numer_bases, numer_counts) = base_counts(u.numer());
+                let (denom_bases, denom_counts) = base_counts(u.denom());
+
+                #[allow(clippy::cast_possible_wrap)] // absurd
+                if any(&numer_counts, |n| (*n as isize) % degree != 0)
+                    || any(&denom_counts, |n| (*n as isize) % degree != 0)
+                {
+                    return Err(Error::UnitNotDivisible);
+                }
+
+                numer = divide_base_counts(&numer_bases, &numer_counts, abs_degree);
+                denom = divide_base_counts(&denom_bases, &denom_counts, abs_degree);
+                if degree < 0 {
+                    (numer, denom) = (denom, numer);
+                }
+            }
+
+            Unit::new(&numer, &denom)
+                .map(|u| Number::new(self.value.powf(1.0 / other.value)).with_unit(u))
+        }
+    }
+}
+
+/// Helper for `roots`. Counts the number of times each unique base appears in
+/// `bases`. Returns parallel vectors containing de-duplicated `bases` and the
+/// number of times each base appears in `bases`.
+fn base_counts(bases: &[&'static Base]) -> (Vec<&'static Base>, Vec<usize>) {
+    let mut uniq_bases: Vec<&'static Base> = Vec::new();
+    let mut counts: Vec<usize> = Vec::new();
+
+    for base in bases {
+        if let Some((ix, _)) = uniq_bases.iter().find_position(|&b| b == base) {
+            counts[ix] += 1;
+        } else {
+            uniq_bases.push(base);
+            counts.push(1);
+        }
+    }
+
+    (uniq_bases, counts)
+}
+
+/// Helper for `roots`. Takes parallel vectors `bases` and `counts` and returns
+/// a vector with each base `bases[n]` appearing `counts[n]` / `divisor` times.
+fn divide_base_counts(
+    bases: &[&'static Base],
+    counts: &[usize],
+    divisor: usize,
+) -> Vec<&'static Base> {
+    let mut result: Vec<&'static Base> = Vec::new();
+    for ix in 0..bases.len() {
+        for _ in 0..(counts[ix] / divisor) {
+            result.push(bases[ix]);
+        }
+    }
+    result
 }
 
 /// Helper for `std::fmt::Display` implementation.
@@ -642,5 +774,54 @@ mod tests {
                 .to_string(),
             "[-inf m⋅s⁻¹]"
         );
+    }
+
+    #[test]
+    fn pow_with_two_dimensionless_numbers() {
+        let a = Number::new(30.149042744979106);
+        let b = Number::new(19.85259661704478);
+        assert_eq!(a.pow(&b).unwrap().value, 2.3303471804569343e+29);
+        let a = Number::new(8.21496240576195);
+        let b = Number::new(-61.0329870106197);
+        assert_eq!(a.pow(&b).unwrap().value, 1.509695975106961e-56);
+        let a = Number::new(23.283172195086944);
+        let b = Number::new(0.0);
+        assert_eq!(a.pow(&b).unwrap().value, 1.0);
+    }
+
+    #[test]
+    fn pow_with_base_with_units_and_dimensionless_exponent() {
+        let a = Number::new(30.149042744979106).with_unit((&METER / &SECOND).unwrap());
+        let b = Number::new(2.0);
+        let c = a.pow(&b).unwrap();
+        assert_eq!(c.value, 908.9647784385772);
+        assert_eq!(c.unit.clone().unwrap().numer(), &[&METER, &METER]);
+        assert_eq!(c.unit.unwrap().denom(), &[&SECOND, &SECOND]);
+
+        let a = Number::new(8.21496240576195).with_unit((&METER / &SECOND).unwrap());
+        let b = Number::new(-3.0);
+        let c = a.pow(&b).unwrap();
+        assert_eq!(c.value, 0.001803778720105492);
+        assert_eq!(
+            c.unit.clone().unwrap().numer(),
+            &[&SECOND, &SECOND, &SECOND]
+        );
+        assert_eq!(c.unit.unwrap().denom(), &[&METER, &METER, &METER]);
+
+        let a = Number::new(23.283172195086944).with_unit((&METER / &SECOND).unwrap());
+        let b = Number::new(0.0);
+        let c = a.pow(&b).unwrap();
+        assert_eq!(c.value, 1.0);
+        assert!(c.unit.is_none());
+    }
+
+    #[test]
+    fn pow_errors() {
+        let a = Number::new(30.149042744979106);
+        let b = Number::new(19.0).with_unit(METER.as_unit());
+        assert!(a.pow(&b).is_err());
+        let a = Number::new(30.149042744979106).with_unit(METER.as_unit());
+        let b = Number::new(19.85259661704478);
+        assert!(a.pow(&b).is_err());
     }
 }

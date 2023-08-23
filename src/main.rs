@@ -82,6 +82,17 @@ fn print_error(error: &eval::Error, word: &String) {
                 units::Error::NonzeroZeroPoint(b) => {
                     println!("operation would place {b} in a nonsensical position");
                 }
+                units::Error::ExponentHasUnits => println!("exponent has units"),
+                units::Error::ExponentNotAnInteger => {
+                    println!("exponent must be an integer when base has units");
+                }
+                units::Error::DegreeHasUnits => println!("degree has units"),
+                units::Error::DegreeNotAnInteger => {
+                    println!("degree must be an integer when radicand has units");
+                }
+                units::Error::UnitNotDivisible => {
+                    println!("radicand's units must be evenly divisible by the degree");
+                }
             },
             builtins::Error::MissingUnit => println!("missing unit"),
             builtins::Error::NotDimensionless => println!("number must be dimensionless"),

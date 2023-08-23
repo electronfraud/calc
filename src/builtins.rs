@@ -19,7 +19,7 @@
 
 use std::collections::HashMap;
 
-use crate::{commit, pop_as_f, pop_as_fu, pop_as_i, pop_as_ii, popf, popn, popnn};
+use crate::{commit, pop_as_f, pop_as_ff, pop_as_fu, pop_as_i, pop_as_ii, popf, popn, popnn};
 use crate::{
     integer, stack,
     stack::Stack,
@@ -129,8 +129,6 @@ pub fn builtin_sub(stack: &mut Stack) -> Result {
 /// - the items are not two numbers;
 /// - the items are not two units; or,
 /// - the items are not a number `a` and a unit `b`.
-///
-/// If there is an error, the stack is unchanged; the operands are not popped.
 pub fn builtin_mul(stack: &mut Stack) -> Result {
     let mut tx = stack.begin();
     let items = tx.pop2()?;
@@ -165,8 +163,6 @@ pub fn builtin_mul(stack: &mut Stack) -> Result {
 /// - the items are not two units;
 /// - the items are not a number `a` and a unit `b`;
 /// - the division would result in a nonsensical temperature unit.
-///
-/// If there is an error, the stack is unchanged; the operands are not popped.
 pub fn builtin_div(stack: &mut Stack) -> Result {
     let mut tx = stack.begin();
     let items = tx.pop2()?;
@@ -180,6 +176,89 @@ pub fn builtin_div(stack: &mut Stack) -> Result {
         (stack::Item::Integer(a), stack::Item::Unit(b)) => tx.pushf((&a / &b)?),
         _ => return Err(stack::Error::TypeMismatch.into()),
     };
+    commit!(tx)
+}
+
+/// `( a b -- a**b )` Raises `a` to the power of `b`.
+///
+/// The following combinations of operands are accepted:
+/// - two dimensionless numbers
+/// - `a` is a number with units and `b` is a dimensionless integer
+///
+/// Raising a number with units to a large power is not recommended.
+///
+/// # Errors
+///
+/// Returns an error if:
+/// - there are fewer than two items on the stack;
+/// - the operation would result in a nonsensical temperature unit; or,
+/// - the items are not one of the accepted combinations described above.
+pub fn builtin_pow(stack: &mut Stack) -> Result {
+    let mut tx = stack.begin();
+    let (a, b) = pop_as_ff!(tx)?;
+    tx.pushf(a.pow(&b)?);
+    commit!(tx)
+}
+
+/// `( a -- e**a )` Raises e to the power of `a`.
+///
+/// # Errors
+///
+/// Returns an error if:
+/// - the stack is empty; or,
+/// - the exponent is not dimensionless.
+pub fn builtin_exp(stack: &mut Stack) -> Result {
+    // This is functionally identical to `e swap **`, which makes it a prime
+    // candidate for pulling out into a library once that's possible.
+    let mut tx = stack.begin();
+    let x = pop_as_f!(tx)?;
+    tx.pushf(units::Number::new(std::f64::consts::E).pow(&x)?);
+    commit!(tx)
+}
+
+/// `( a -- a**1/2 )` Finds the square root of `a`.
+///
+/// # Errors
+///
+/// Returns an error if:
+/// - the stack is empty;
+/// - `a` has units that don't have an integral square root.
+pub fn builtin_sqrt(stack: &mut Stack) -> Result {
+    // Another library candidate: `2 /**`
+    let mut tx = stack.begin();
+    let a = pop_as_f!(tx)?;
+    tx.pushf(a.root(&units::Number::new(2.0))?);
+    commit!(tx)
+}
+
+/// `( a -- a**1/3 )` Finds the cube root of `a`.
+///
+/// # Errors
+///
+/// Returns an error if:
+/// - the stack is empty;
+/// - `a` has units that don't have an integral cube root.
+pub fn builtin_cbrt(stack: &mut Stack) -> Result {
+    // Library candidate: `3 /**`
+    let mut tx = stack.begin();
+    let a = pop_as_f!(tx)?;
+    tx.pushf(a.root(&units::Number::new(3.0))?);
+    commit!(tx)
+}
+
+/// `( a b -- a**1/b )` Finds the `b`th root of `a`.
+///
+/// # Errors
+///
+/// Returns an error if:
+/// - there are fewer than two items on the stack;
+/// - `b` has units;
+/// - `a` has units and `b` is not whole; or,
+/// - `a` has units that don't have an integral `b`th root.
+pub fn builtin_root(stack: &mut Stack) -> Result {
+    let mut tx = stack.begin();
+    let (a, b) = pop_as_ff!(tx)?;
+    tx.pushf(a.root(&b)?);
     commit!(tx)
 }
 
@@ -287,8 +366,6 @@ pub fn builtin_drop(stack: &mut Stack) -> Result {
 /// - there are fewer than two items on the stack;
 /// - the items are not a number and a unit; or,
 /// - the number has units that are incommensurable with `u`.
-///
-/// If there is an error, the stack is unchanged; the operands are not popped.
 pub fn builtin_into(stack: &mut Stack) -> Result {
     let mut tx = stack.begin();
     let (a, u) = pop_as_fu!(tx)?;
@@ -497,6 +574,11 @@ pub fn table() -> Table {
         ("-", builtin_sub),
         ("*", builtin_mul),
         ("/", builtin_div),
+        ("**", builtin_pow),
+        ("exp", builtin_exp),
+        ("sqrt", builtin_sqrt),
+        ("cbrt", builtin_cbrt),
+        ("/**", builtin_root),
         // Trigonometric
         ("sin", builtin_sin),
         ("cos", builtin_cos),
