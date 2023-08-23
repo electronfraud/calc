@@ -436,6 +436,68 @@ binrepr!(builtin_dec, integer::Representation::Decimal);
 binrepr!(builtin_oct, integer::Representation::Octal);
 binrepr!(builtin_hex, integer::Representation::Hexadecimal);
 
+/// `( a b -- [a & (1<<b)] )` Sets the bit in `a` at index `b`. The least
+/// significant bit is index zero.
+///
+/// # Errors
+///
+/// An error occurs if:
+/// - there are fewer than two items on the stack;
+/// - `a` is not an integer; or,
+/// - `b` is not a non-negative integer.
+pub fn builtin_bset(stack: &mut Stack) -> Result {
+    let mut tx = stack.begin();
+    let (a, b) = pop_as_ii!(tx)?;
+    if b.value >= 0 {
+        tx.pushi(integer::Integer::new(a.value & (1 << b.value), a.repr));
+        commit!(tx)
+    } else {
+        Err(Error::NotNonNegative)
+    }
+}
+
+/// `( a b -- [a & ~(1<<b)] )` Clears the bit in `a` at index `b`. The least
+/// significant bit is index zero.
+///
+/// # Errors
+///
+/// An error occurs if:
+/// - there are fewer than two items on the stack;
+/// - `a` is not an integer; or,
+/// - `b` is not a non-negative integer.
+pub fn builtin_bclr(stack: &mut Stack) -> Result {
+    let mut tx = stack.begin();
+    let (a, b) = pop_as_ii!(tx)?;
+    if b.value >= 0 {
+        tx.pushi(integer::Integer::new(a.value & !(1 << b.value), a.repr));
+        commit!(tx)
+    } else {
+        Err(Error::NotNonNegative)
+    }
+}
+
+/// `( a b -- a [(a >> b) & 1] )` Pushes the bit in `a` at index `b`. The least
+/// significant bit is index zero.
+///
+/// # Errors
+///
+/// An error occurs if:
+/// - there are fewer than two items on the stack;
+/// - `a` is not an integer; or,
+/// - `b` is not a non-negative integer.
+pub fn builtin_bget(stack: &mut Stack) -> Result {
+    let mut tx = stack.begin();
+    let (a, b) = pop_as_ii!(tx)?;
+    if b.value >= 0 {
+        let bit = (a.value >> b.value) & 1;
+        tx.pushi(a);
+        tx.pushi(integer::Integer::bin(bit));
+        commit!(tx)
+    } else {
+        Err(Error::NotNonNegative)
+    }
+}
+
 /// `( ... a1 ... aN N -- a1 ... aN )` Removes everything from the stack except
 /// the topmost `N` items.
 ///
@@ -598,6 +660,9 @@ pub fn table() -> Table {
         ("oct", builtin_oct),
         ("dec", builtin_dec),
         ("hex", builtin_hex),
+        ("bset", builtin_bset),
+        ("bclr", builtin_bclr),
+        ("bget", builtin_bget),
         // Stack Manipulation
         ("clear", builtin_clear),
         ("dup", builtin_dup),

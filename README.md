@@ -262,16 +262,19 @@ This is a list of all available commands.
 
 #### Bitwise and Binary Integer Operations
 
-| Name  | Description                        |
-|-------|------------------------------------|
-| `&`   | Bitwise AND.                       |
-| `\|`   | Bitwise OR.                       |
-| `^`   | Bitwise XOR.                       |
-| `~`   | Bitwise complement.                |
-| `hex` | Display an integer in hexadecimal. |
-| `dec` | Display an integer in decimal.     |
-| `oct` | Display an integer in octal.       |
-| `bin` | Display an integer in binary.      |
+| Name   | Description                         |
+|--------|-------------------------------------|
+| `&`    | Bitwise AND.                        |
+| `\|`    | Bitwise OR.                         |
+| `^`    | Bitwise XOR.                        |
+| `~`    | Bitwise complement.                 |
+| `hex`  | Display an integer in hexadecimal.  |
+| `dec`  | Display an integer in decimal.      |
+| `oct`  | Display an integer in octal.        |
+| `bin`  | Display an integer in binary.       |
+| `bset` | Set a bit in an integer by index.   |
+| `bclr` | Clear a bit in an integer by index. |
+| `bget` | Get a bit in an integer by index.   |
 
 #### Stack Manipulation
 
