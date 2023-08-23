@@ -615,4 +615,145 @@ mod tests {
             _ => panic!("expected Item::Float"),
         }
     }
+
+    #[test]
+    fn transaction_pop_from_empty_stack() {
+        let mut s = Stack::new();
+        {
+            let mut tx = s.begin();
+            assert!(tx.pop().is_err());
+        }
+    }
+
+    #[test]
+    fn transaction_pop_after_transaction_push() {
+        let mut s = Stack::new();
+        {
+            let mut tx = s.begin();
+            tx.pushx(1.0);
+            match tx.pop() {
+                Ok(Item::Float(x)) => assert_eq!(x.value, 1.0),
+                _ => panic!("expected Ok(Item::Float)"),
+            }
+            assert!(tx.pop().is_err());
+        }
+    }
+
+    #[test]
+    fn transaction_pop_after_stack_push() {
+        let mut s = Stack::new();
+        s.pushx(2.0);
+        {
+            let mut tx = s.begin();
+            match tx.pop() {
+                Ok(Item::Float(x)) => assert_eq!(x.value, 2.0),
+                _ => panic!("expected Ok(Item::Float)"),
+            }
+            assert!(tx.pop().is_err());
+        }
+    }
+
+    #[test]
+    fn transaction_pop_after_stack_push_and_transaction_push() {
+        let mut s = Stack::new();
+        s.pushx(2.0);
+        {
+            let mut tx = s.begin();
+            tx.pushx(3.0);
+            match tx.pop() {
+                Ok(Item::Float(x)) => assert_eq!(x.value, 3.0),
+                _ => panic!("expected Ok(Item::Float)"),
+            }
+            match tx.pop() {
+                Ok(Item::Float(x)) => assert_eq!(x.value, 2.0),
+                _ => panic!("expected Ok(Item::Float)"),
+            }
+            assert!(tx.pop().is_err());
+        }
+    }
+
+    #[test]
+    fn transaction_pop2_from_empty_stack() {
+        let mut s = Stack::new();
+        {
+            let mut tx = s.begin();
+            assert!(tx.pop2().is_err());
+        }
+    }
+
+    #[test]
+    fn transaction_pop2_after_transaction_push() {
+        let mut s = Stack::new();
+        {
+            let mut tx = s.begin();
+            tx.pushx(1.0);
+            assert!(tx.pop2().is_err());
+            assert_eq!(tx.height(), 1);
+        }
+    }
+
+    #[test]
+    fn transaction_pop2_after_stack_push() {
+        let mut s = Stack::new();
+        s.pushx(2.0);
+        {
+            let mut tx = s.begin();
+            assert!(tx.pop2().is_err());
+            assert_eq!(tx.height(), 1);
+        }
+    }
+
+    #[test]
+    fn transaction_pop2_after_two_stack_pushes() {
+        let mut s = Stack::new();
+        s.pushx(2.0);
+        s.pushx(3.0);
+        {
+            let mut tx = s.begin();
+            match tx.pop2() {
+                Ok((Item::Float(a), Item::Float(b))) => {
+                    assert_eq!(a.value, 2.0);
+                    assert_eq!(b.value, 3.0);
+                }
+                _ => panic!("expected Ok((Item::Float, Item::Float))"),
+            }
+            assert!(tx.pop().is_err());
+        }
+    }
+
+    #[test]
+    fn transaction_pop2_after_stack_push_and_transaction_push() {
+        let mut s = Stack::new();
+        s.pushx(2.0);
+        {
+            let mut tx = s.begin();
+            tx.pushx(3.0);
+            match tx.pop2() {
+                Ok((Item::Float(a), Item::Float(b))) => {
+                    assert_eq!(a.value, 2.0);
+                    assert_eq!(b.value, 3.0);
+                }
+                _ => panic!("expected Ok((Item::Float, Item::Float))"),
+            }
+            assert!(tx.pop().is_err());
+        }
+    }
+
+    #[test]
+    fn transaction_pop2_after_two_transaction_pushes() {
+        let mut s = Stack::new();
+        {
+            let mut tx = s.begin();
+            tx.pushx(2.0);
+            tx.pushx(3.0);
+            match tx.pop2() {
+                Ok((Item::Float(a), Item::Float(b))) => {
+                    assert_eq!(a.value, 2.0);
+                    assert_eq!(b.value, 3.0);
+                }
+                _ => panic!("expected Ok((Item::Float, Item::Float))"),
+            }
+            assert!(tx.pop().is_err());
+        }
+    }
 }

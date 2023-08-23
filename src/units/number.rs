@@ -52,6 +52,9 @@ impl Number {
 
 /// Helper for `std::fmt::Display` implementation.
 fn should_use_exponent_format(x: f64) -> bool {
+    // I don't know if these thresholds make sense, or if thresholds are even
+    // the right way to deal with formatting choices. In casual use these seem
+    // to be ok though.
     x.is_finite() && x != 0.0 && (x.abs() < 0.001 || x.abs() >= 10_000_000_000.0)
 }
 
@@ -59,7 +62,9 @@ impl std::fmt::Display for Number {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> Result<(), std::fmt::Error> {
         // Use exponent format for very small and very large numbers. Use
         // decimal format for everything else (including NaNs and infinites).
-        let value = if should_use_exponent_format(self.value) {
+        let value = if self.value == -0.0 {
+            "0".to_string()
+        } else if should_use_exponent_format(self.value) {
             // Use exponent format, but trim trailing zeroes. Then, delete the
             // decimal point if the entire fractional component was zeroes.
             let e = format!("{:.6e}", self.value);
@@ -208,7 +213,7 @@ impl std::ops::Div<&Unit> for &Number {
 #[cfg(test)]
 mod tests {
     use crate::units::Number;
-    use crate::units::{HOUR, KILOGRAM, METER, MILE, SECOND};
+    use crate::units::{HOUR, KILOGRAM, METER, MILE, SECOND, TEMP_CELSIUS};
 
     #[test]
     fn dimensionless_added_to_dimensionless() {
@@ -218,19 +223,19 @@ mod tests {
     }
 
     #[test]
-    fn dimensionless_added_to_unit() {
+    fn dimensionless_added_to_number_with_unit() {
         let result = &Number::new(5.0) + &Number::new(10.0).with_unit((&METER / &SECOND).unwrap());
         assert!(result.is_err());
     }
 
     #[test]
-    fn unit_added_to_dimensionless() {
+    fn number_with_unit_added_to_dimensionless() {
         let result = &Number::new(10.0).with_unit((&METER / &SECOND).unwrap()) + &Number::new(5.0);
         assert!(result.is_err());
     }
 
     #[test]
-    fn unit_added_to_compatible_unit() {
+    fn number_with_unit_added_to_compatible_number_with_unit() {
         let x = (&Number::new(10.0).with_unit((&METER / &SECOND).unwrap())
             + &Number::new(5.0).with_unit((&MILE / &HOUR).unwrap()))
             .unwrap();
@@ -240,9 +245,45 @@ mod tests {
     }
 
     #[test]
-    fn unit_added_to_incompatible_unit() {
+    fn number_with_unit_added_to_incompatible_number_with_unit() {
         let result = &Number::new(10.0).with_unit((&METER / &SECOND).unwrap())
             + &Number::new(5.0).with_unit((&MILE / &KILOGRAM).unwrap());
+        assert!(result.is_err());
+    }
+
+    #[test]
+    fn dimensionless_subtracted_from_dimensionless() {
+        let x = (&Number::new(5.0) - &Number::new(10.0)).unwrap();
+        assert_eq!(x.value, -5.0);
+        assert!(x.is_dimensionless());
+    }
+
+    #[test]
+    fn number_with_unit_subtracted_from_dimensionless() {
+        let result = &Number::new(5.0) - &Number::new(10.0).with_unit((&METER / &SECOND).unwrap());
+        assert!(result.is_err());
+    }
+
+    #[test]
+    fn dimensionless_subtracted_from_number_with_unit() {
+        let result = &Number::new(10.0).with_unit((&METER / &SECOND).unwrap()) - &Number::new(5.0);
+        assert!(result.is_err());
+    }
+
+    #[test]
+    fn number_with_unit_subtracted_from_compatible_number_with_unit() {
+        let x = (&Number::new(10.0).with_unit((&METER / &SECOND).unwrap())
+            - &Number::new(5.0).with_unit((&MILE / &HOUR).unwrap()))
+            .unwrap();
+        assert_eq!(x.value, 7.7648);
+        assert_eq!(*x.unit.as_ref().unwrap().numer(), vec![&METER]);
+        assert_eq!(*x.unit.unwrap().denom(), vec![&SECOND]);
+    }
+
+    #[test]
+    fn number_with_unit_subtracted_from_incompatible_number_with_unit() {
+        let result = &Number::new(10.0).with_unit((&METER / &SECOND).unwrap())
+            - &Number::new(5.0).with_unit((&MILE / &KILOGRAM).unwrap());
         assert!(result.is_err());
     }
 
@@ -254,7 +295,7 @@ mod tests {
     }
 
     #[test]
-    fn dimensionless_multiplied_by_unit() {
+    fn dimensionless_multiplied_by_number_with_unit() {
         let x = (&Number::new(5.0) * &Number::new(10.0).with_unit((&METER / &SECOND).unwrap()))
             .unwrap();
         assert_eq!(x.value, 50.0);
@@ -263,7 +304,7 @@ mod tests {
     }
 
     #[test]
-    fn unit_multiplied_by_dimensionless() {
+    fn number_with_unit_multiplied_by_dimensionless() {
         let x = (&Number::new(5.0).with_unit((&METER / &SECOND).unwrap()) * &Number::new(10.0))
             .unwrap();
         assert_eq!(x.value, 50.0);
@@ -272,12 +313,334 @@ mod tests {
     }
 
     #[test]
-    fn unit_multiplied_by_unit() {
+    fn number_with_unit_multiplied_by_number_with_unit() {
         let x = (&Number::new(5.0).with_unit((&METER / &SECOND).unwrap())
             * &Number::new(10.0).with_unit((&MILE / &HOUR).unwrap()))
             .unwrap();
         assert_eq!(x.value, 50.0);
         assert_eq!(*x.unit.as_ref().unwrap().numer(), vec![&METER, &MILE]);
         assert_eq!(*x.unit.unwrap().denom(), vec![&SECOND, &HOUR]);
+    }
+
+    #[test]
+    fn dimensionless_multiplied_by_unit() {
+        let x = (&Number::new(5.0) * &(&MILE / &HOUR).unwrap()).unwrap();
+        assert_eq!(x.value, 5.0);
+        assert_eq!(*x.unit.as_ref().unwrap().numer(), vec![&MILE]);
+        assert_eq!(*x.unit.unwrap().denom(), vec![&HOUR]);
+    }
+
+    #[test]
+    fn number_with_unit_multiplied_by_unit() {
+        let x = (&Number::new(5.0).with_unit(((&MILE * &HOUR).unwrap() / &KILOGRAM).unwrap())
+            * &(&MILE / &HOUR).unwrap())
+            .unwrap();
+        assert_eq!(x.value, 5.0);
+        assert_eq!(*x.unit.as_ref().unwrap().numer(), vec![&MILE, &MILE]);
+        assert_eq!(*x.unit.unwrap().denom(), vec![&KILOGRAM]);
+    }
+
+    #[test]
+    fn number_with_unit_multiplied_by_temperature() {
+        let x = &Number::new(5.0).with_unit(((&MILE * &HOUR).unwrap() / &KILOGRAM).unwrap())
+            * &TEMP_CELSIUS.as_unit();
+        assert!(x.is_err());
+    }
+
+    #[test]
+    fn dimensionless_divided_by_dimensionless() {
+        let x = (&Number::new(5.0) / &Number::new(10.0)).unwrap();
+        assert_eq!(x.value, 0.5);
+        assert!(x.is_dimensionless());
+    }
+
+    #[test]
+    fn dimensionless_divided_by_number_with_unit() {
+        let x = (&Number::new(5.0) / &Number::new(10.0).with_unit((&METER / &SECOND).unwrap()))
+            .unwrap();
+        assert_eq!(x.value, 0.5);
+        assert_eq!(*x.unit.as_ref().unwrap().numer(), vec![&SECOND]);
+        assert_eq!(*x.unit.unwrap().denom(), vec![&METER]);
+    }
+
+    #[test]
+    fn number_with_unit_divided_by_dimensionless() {
+        let x = (&Number::new(5.0).with_unit((&METER / &SECOND).unwrap()) / &Number::new(10.0))
+            .unwrap();
+        assert_eq!(x.value, 0.5);
+        assert_eq!(*x.unit.as_ref().unwrap().numer(), vec![&METER]);
+        assert_eq!(*x.unit.unwrap().denom(), vec![&SECOND]);
+    }
+
+    #[test]
+    fn number_with_unit_divided_by_number_with_unit() {
+        let x = (&Number::new(5.0).with_unit((&METER / &SECOND).unwrap())
+            / &Number::new(10.0).with_unit((&MILE / &HOUR).unwrap()))
+            .unwrap();
+        assert_eq!(x.value, 0.5);
+        assert_eq!(*x.unit.as_ref().unwrap().numer(), vec![&METER, &HOUR]);
+        assert_eq!(*x.unit.unwrap().denom(), vec![&SECOND, &MILE]);
+    }
+
+    #[test]
+    fn dimensionless_divided_by_unit() {
+        let x = (&Number::new(5.0) / &(&MILE / &HOUR).unwrap()).unwrap();
+        assert_eq!(x.value, 5.0);
+        assert_eq!(*x.unit.as_ref().unwrap().numer(), vec![&HOUR]);
+        assert_eq!(*x.unit.unwrap().denom(), vec![&MILE]);
+    }
+
+    #[test]
+    fn number_with_unit_divided_by_unit() {
+        let x = (&Number::new(5.0).with_unit(((&MILE * &HOUR).unwrap() / &KILOGRAM).unwrap())
+            / &(&MILE / &HOUR).unwrap())
+            .unwrap();
+        assert_eq!(x.value, 5.0);
+        assert_eq!(*x.unit.as_ref().unwrap().numer(), vec![&HOUR, &HOUR]);
+        assert_eq!(*x.unit.unwrap().denom(), vec![&KILOGRAM]);
+    }
+
+    #[test]
+    fn number_with_unit_divided_by_temperature() {
+        let x = &Number::new(5.0).with_unit(((&MILE * &HOUR).unwrap() / &KILOGRAM).unwrap())
+            / &TEMP_CELSIUS.as_unit();
+        assert!(x.is_err());
+    }
+
+    #[test]
+    fn display_dimensionless_with_exponent_format() {
+        // six decimal places max
+        assert_eq!(Number::new(0.000898359204909915).to_string(), "8.983592e-4");
+        assert_eq!(
+            Number::new(4180506471207144.8470604546950069).to_string(),
+            "4.180506e15"
+        );
+        // trim trailing zeroes
+        assert_eq!(Number::new(0.0000442).to_string(), "4.42e-5");
+        assert_eq!(
+            Number::new(5821600000000000.3253253941312786).to_string(),
+            "5.8216e15"
+        );
+        // trim trailing zeroes and decimal point
+        assert_eq!(Number::new(0.0004).to_string(), "4e-4");
+        assert_eq!(
+            Number::new(2000000000000.8142598874151412).to_string(),
+            "2e12"
+        );
+        // again, but negative
+        assert_eq!(
+            Number::new(-0.000898359204909915).to_string(),
+            "-8.983592e-4"
+        );
+        assert_eq!(
+            Number::new(-4180506471207144.8470604546950069).to_string(),
+            "-4.180506e15"
+        );
+        assert_eq!(Number::new(-0.0000442).to_string(), "-4.42e-5");
+        assert_eq!(
+            Number::new(-5821600000000000.3253253941312786).to_string(),
+            "-5.8216e15"
+        );
+        assert_eq!(Number::new(-0.0004).to_string(), "-4e-4");
+        assert_eq!(
+            Number::new(-2000000000000.8142598874151412).to_string(),
+            "-2e12"
+        );
+    }
+
+    #[test]
+    fn display_dimensionless_with_decimal_format() {
+        // make sure the basics work
+        assert_eq!(Number::new(0.0).to_string(), "0");
+        assert_eq!(Number::new(1.0).to_string(), "1");
+        // six decimal places max
+        assert_eq!(Number::new(0.0027442391822086665).to_string(), "0.002744");
+        assert_eq!(Number::new(932.9624592477858).to_string(), "932.962459");
+        // trim trailing zeroes
+        assert_eq!(Number::new(0.0084).to_string(), "0.0084");
+        assert_eq!(Number::new(804.2737).to_string(), "804.2737");
+        // trim trailing zeroes and decimal point
+        assert_eq!(Number::new(600.0).to_string(), "600");
+        // again, but negative
+        assert_eq!(Number::new(-0.0).to_string(), "0");
+        assert_eq!(Number::new(-1.0).to_string(), "-1");
+        // six decimal places max
+        assert_eq!(Number::new(-0.0027442391822086665).to_string(), "-0.002744");
+        assert_eq!(Number::new(-932.9624592477858).to_string(), "-932.962459");
+        // trim trailing zeroes
+        assert_eq!(Number::new(-0.0084).to_string(), "-0.0084");
+        assert_eq!(Number::new(-804.2737).to_string(), "-804.2737");
+        // trim trailing zeroes and decimal point
+        assert_eq!(Number::new(-600.0).to_string(), "-600");
+    }
+
+    #[test]
+    fn display_with_units_with_exponent_format() {
+        let u = (&METER / &SECOND).unwrap();
+        // six decimal places max
+        assert_eq!(
+            Number::new(0.000898359204909915)
+                .with_unit(u.clone())
+                .to_string(),
+            "[8.983592e-4 m⋅s⁻¹]"
+        );
+        assert_eq!(
+            Number::new(4180506471207144.8470604546950069)
+                .with_unit(u.clone())
+                .to_string(),
+            "[4.180506e15 m⋅s⁻¹]"
+        );
+        // trim trailing zeroes
+        assert_eq!(
+            Number::new(0.0000442).with_unit(u.clone()).to_string(),
+            "[4.42e-5 m⋅s⁻¹]"
+        );
+        assert_eq!(
+            Number::new(5821600000000000.3253253941312786)
+                .with_unit(u.clone())
+                .to_string(),
+            "[5.8216e15 m⋅s⁻¹]"
+        );
+        // trim trailing zeroes and decimal point
+        assert_eq!(
+            Number::new(0.0004).with_unit(u.clone()).to_string(),
+            "[4e-4 m⋅s⁻¹]"
+        );
+        assert_eq!(
+            Number::new(2000000000000.8142598874151412)
+                .with_unit(u.clone())
+                .to_string(),
+            "[2e12 m⋅s⁻¹]"
+        );
+        // again, but negative
+        assert_eq!(
+            Number::new(-0.000898359204909915)
+                .with_unit(u.clone())
+                .to_string(),
+            "[-8.983592e-4 m⋅s⁻¹]"
+        );
+        assert_eq!(
+            Number::new(-4180506471207144.8470604546950069)
+                .with_unit(u.clone())
+                .to_string(),
+            "[-4.180506e15 m⋅s⁻¹]"
+        );
+        assert_eq!(
+            Number::new(-0.0000442).with_unit(u.clone()).to_string(),
+            "[-4.42e-5 m⋅s⁻¹]"
+        );
+        assert_eq!(
+            Number::new(-5821600000000000.3253253941312786)
+                .with_unit(u.clone())
+                .to_string(),
+            "[-5.8216e15 m⋅s⁻¹]"
+        );
+        assert_eq!(
+            Number::new(-0.0004).with_unit(u.clone()).to_string(),
+            "[-4e-4 m⋅s⁻¹]"
+        );
+        assert_eq!(
+            Number::new(-2000000000000.8142598874151412)
+                .with_unit(u.clone())
+                .to_string(),
+            "[-2e12 m⋅s⁻¹]"
+        );
+    }
+
+    #[test]
+    fn display_with_units_with_decimal_format() {
+        let u = (&METER / &SECOND).unwrap();
+        // make sure the basics work
+        assert_eq!(
+            Number::new(0.0).with_unit(u.clone()).to_string(),
+            "[0 m⋅s⁻¹]"
+        );
+        assert_eq!(
+            Number::new(1.0).with_unit(u.clone()).to_string(),
+            "[1 m⋅s⁻¹]"
+        );
+        // six decimal places max
+        assert_eq!(
+            Number::new(0.0027442391822086665)
+                .with_unit(u.clone())
+                .to_string(),
+            "[0.002744 m⋅s⁻¹]"
+        );
+        assert_eq!(
+            Number::new(932.9624592477858)
+                .with_unit(u.clone())
+                .to_string(),
+            "[932.962459 m⋅s⁻¹]"
+        );
+        // trim trailing zeroes
+        assert_eq!(
+            Number::new(0.0084).with_unit(u.clone()).to_string(),
+            "[0.0084 m⋅s⁻¹]"
+        );
+        assert_eq!(
+            Number::new(804.2737).with_unit(u.clone()).to_string(),
+            "[804.2737 m⋅s⁻¹]"
+        );
+        // trim trailing zeroes and decimal point
+        assert_eq!(
+            Number::new(600.0).with_unit(u.clone()).to_string(),
+            "[600 m⋅s⁻¹]"
+        );
+        // again, but negative
+        assert_eq!(
+            Number::new(-0.0).with_unit(u.clone()).to_string(),
+            "[0 m⋅s⁻¹]"
+        );
+        assert_eq!(
+            Number::new(-1.0).with_unit(u.clone()).to_string(),
+            "[-1 m⋅s⁻¹]"
+        );
+        assert_eq!(
+            Number::new(-0.0027442391822086665)
+                .with_unit(u.clone())
+                .to_string(),
+            "[-0.002744 m⋅s⁻¹]"
+        );
+        assert_eq!(
+            Number::new(-932.9624592477858)
+                .with_unit(u.clone())
+                .to_string(),
+            "[-932.962459 m⋅s⁻¹]"
+        );
+        assert_eq!(
+            Number::new(-0.0084).with_unit(u.clone()).to_string(),
+            "[-0.0084 m⋅s⁻¹]"
+        );
+        assert_eq!(
+            Number::new(-804.2737).with_unit(u.clone()).to_string(),
+            "[-804.2737 m⋅s⁻¹]"
+        );
+        assert_eq!(
+            Number::new(-600.0).with_unit(u.clone()).to_string(),
+            "[-600 m⋅s⁻¹]"
+        );
+    }
+
+    #[test]
+    fn display_special_values() {
+        assert_eq!(Number::new(f64::NAN).to_string(), "NaN");
+        assert_eq!(Number::new(f64::INFINITY).to_string(), "inf");
+        assert_eq!(Number::new(f64::NEG_INFINITY).to_string(), "-inf");
+        // again, but with units
+        let u = (&METER / &SECOND).unwrap();
+        assert_eq!(
+            Number::new(f64::NAN).with_unit(u.clone()).to_string(),
+            "[NaN m⋅s⁻¹]"
+        );
+        assert_eq!(
+            Number::new(f64::INFINITY).with_unit(u.clone()).to_string(),
+            "[inf m⋅s⁻¹]"
+        );
+        assert_eq!(
+            Number::new(f64::NEG_INFINITY)
+                .with_unit(u.clone())
+                .to_string(),
+            "[-inf m⋅s⁻¹]"
+        );
     }
 }

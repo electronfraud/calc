@@ -142,7 +142,7 @@ impl std::ops::Div<Unit> for &'static Base {
 
 #[cfg(test)]
 mod tests {
-    use crate::units::{KILOGRAM, METER, SECOND};
+    use crate::units::{Base, PhysicalQuantity, KILOGRAM, METER, SECOND};
 
     #[test]
     fn base_multiplied_by_base() {
@@ -172,5 +172,17 @@ mod tests {
         let kg_s_per_m = (&KILOGRAM / m_per_s).unwrap();
         assert_eq!(*kg_s_per_m.numer(), vec![&KILOGRAM, &SECOND]);
         assert_eq!(*kg_s_per_m.denom(), vec![&METER]);
+    }
+
+    #[test]
+    fn display() {
+        let base = Base::new("foo", PhysicalQuantity::Time, 2.5);
+        assert_eq!(base.to_string(), "foo");
+    }
+
+    #[test]
+    fn with_zero() {
+        let base = Base::new("foo", PhysicalQuantity::Time, 2.5).with_zero(100.0);
+        assert_eq!(base.zero, Some(100.0));
     }
 }
