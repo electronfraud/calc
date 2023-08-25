@@ -628,6 +628,7 @@ pub fn table() -> Table {
         // Constants
         ("c", constf!(299_792_458.0, METER / SECOND) as Builtin),
         ("e", constx!(std::f64::consts::E)),
+        ("g0", constf!(9.8065, (METER / SECOND).unwrap() / SECOND)),
         ("h", constf!(6.626_070_15e-34, &*JOULE * SECOND)),
         ("hbar", constf!(1.054_571_817e-34, &*JOULE * SECOND)),
         ("pi", constx!(std::f64::consts::PI)),
@@ -691,7 +692,7 @@ pub fn table() -> Table {
         base!(units::MIL),
         base!(units::YARD),
         // Mass
-        base!(units::POUND),
+        base!(units::POUND_MASS),
         base!(units::OUNCE),
         // Temperature
         base!(units::RANKINE),
@@ -705,6 +706,7 @@ pub fn table() -> Table {
         unit!(&*units::NEWTON),
         // Force
         unit!(&*units::JOULE),
+        unit!(&*units::POUND_FORCE),
         // Power
         unit!(&*units::WATT),
         // Pressure

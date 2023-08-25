@@ -114,6 +114,12 @@ impl Unit {
         &self.denom
     }
 
+    /// Return this unit's factor.
+    #[must_use]
+    pub fn factor(&self) -> f64 {
+        self.factor
+    }
+
     /// Converts a number in this unit to another unit.
     ///
     /// # Errors
@@ -130,6 +136,7 @@ impl Unit {
         }
 
         // Reduce to SI
+        num *= self.factor;
         for base in &self.numer {
             if let Some(z) = base.zero {
                 num -= z;
@@ -139,7 +146,6 @@ impl Unit {
         for base in &self.denom {
             num /= base.factor;
         }
-        num *= self.factor;
 
         // Raise to new unit
         for base in &other.numer {
@@ -234,12 +240,25 @@ impl Unit {
         let mut s_denom = Vec::from(self.denom.as_slice());
         let mut numer_ix = 0;
         let mut should_incr: bool;
+        let mut factor = self.factor;
 
         while numer_ix < s_numer.len() {
             should_incr = true;
 
             for denom_ix in 0..s_denom.len() {
+                // Identical bases can be removed
                 if s_numer[numer_ix] == s_denom[denom_ix] {
+                    s_numer.remove(numer_ix);
+                    s_denom.remove(denom_ix);
+                    should_incr = false;
+                    break;
+                }
+
+                // Bases measuring the same physical quantity but different
+                // factors have to be worked into the new unit's factor
+                if s_numer[numer_ix].physq == s_denom[denom_ix].physq {
+                    factor *= s_numer[numer_ix].factor;
+                    factor /= s_denom[denom_ix].factor;
                     s_numer.remove(numer_ix);
                     s_denom.remove(denom_ix);
                     should_incr = false;
@@ -256,7 +275,7 @@ impl Unit {
             symbol: self.symbol.clone(),
             numer: s_numer,
             denom: s_denom,
-            factor: self.factor,
+            factor,
         }
     }
 }
@@ -344,7 +363,7 @@ impl std::ops::Mul<Self> for &Unit {
         let mut denom = self.denom.clone();
         numer.extend(&other.numer);
         denom.extend(&other.denom);
-        Unit::new(numer.as_slice(), denom.as_slice())
+        Unit::new(numer.as_slice(), denom.as_slice()).map(|u| u.with_factor(u.factor * self.factor))
     }
 }
 
@@ -367,6 +386,7 @@ impl std::ops::Mul<Base> for &Unit {
         let mut numer = self.numer.clone();
         numer.extend([other]);
         Unit::new(numer.as_slice(), self.denom.as_slice())
+            .map(|u| u.with_factor(u.factor * self.factor))
     }
 }
 
@@ -380,7 +400,7 @@ impl std::ops::Div<Self> for &Unit {
         let mut denom = self.denom.clone();
         numer.extend(&other.denom);
         denom.extend(&other.numer);
-        Unit::new(numer.as_slice(), denom.as_slice())
+        Unit::new(numer.as_slice(), denom.as_slice()).map(|u| u.with_factor(u.factor * self.factor))
     }
 }
 
@@ -403,6 +423,7 @@ impl std::ops::Div<Base> for &Unit {
         let mut denom = self.denom.clone();
         denom.extend([other]);
         Unit::new(self.numer.as_slice(), denom.as_slice())
+            .map(|u| u.with_factor(u.factor * self.factor))
     }
 }
 
@@ -412,8 +433,9 @@ mod tests {
 
     use crate::units::Unit;
     use crate::units::{
-        AMPERE, DEG_CELSIUS, DEG_FAHRENHEIT, FOOT, HOUR, KELVIN, KILOGRAM, METER, MILE,
-        NAUTICAL_MILE, RANKINE, SECOND, TEMP_CELSIUS, TEMP_FAHRENHEIT, VOLT,
+        AMPERE, DEG_CELSIUS, DEG_FAHRENHEIT, FOOT, HOUR, KELVIN, KILOGRAM, KILOPASCAL, METER, MILE,
+        NAUTICAL_MILE, NEWTON, POUND_FORCE, PSI, RANKINE, SECOND, TEMP_CELSIUS, TEMP_FAHRENHEIT,
+        VOLT,
     };
 
     #[test]
@@ -709,5 +731,16 @@ mod tests {
         assert_eq!(VOLT.convert(1.0, &millivolt).unwrap(), 1000.0);
         let kilovolt = VOLT.with_factor(1000.0).with_symbol("kV");
         assert_eq!(millivolt.convert(1.0, &kilovolt).unwrap(), 0.000001);
+    }
+
+    #[test]
+    fn conversion_between_systems() {
+        assert_eq!(POUND_FORCE.convert(1.0, &NEWTON).unwrap(), 4.4482216152605);
+        assert_eq!(
+            NEWTON.convert(1.0, &POUND_FORCE).unwrap(),
+            0.22480894309971047
+        );
+        assert_eq!(PSI.convert(1.0, &KILOPASCAL).unwrap(), 6.89475729316836);
+        assert_eq!(KILOPASCAL.convert(1.0, &PSI).unwrap(), 0.14503773773020925);
     }
 }

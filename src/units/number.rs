@@ -38,10 +38,17 @@ impl Number {
     /// Returns a `Number` with the same value as this one but different units.
     /// No unit conversion is performed.
     #[must_use]
-    pub const fn with_unit(&self, unit: Unit) -> Number {
-        Number {
-            value: self.value,
-            unit: Some(unit),
+    pub fn with_unit(&self, unit: Unit) -> Number {
+        if unit.numer().is_empty() && unit.denom().is_empty() {
+            Number {
+                value: self.value * unit.factor(),
+                unit: None,
+            }
+        } else {
+            Number {
+                value: self.value,
+                unit: Some(unit),
+            }
         }
     }
 
@@ -340,6 +347,8 @@ impl std::ops::Div<&Unit> for &Number {
 
 #[cfg(test)]
 mod tests {
+    use approx::assert_relative_eq;
+
     use crate::units::Number;
     use crate::units::{HOUR, KILOGRAM, METER, MILE, SECOND, TEMP_CELSIUS};
 
@@ -505,9 +514,8 @@ mod tests {
         let x = (&Number::new(5.0).with_unit((METER / SECOND).unwrap())
             / &Number::new(10.0).with_unit((MILE / HOUR).unwrap()))
             .unwrap();
-        assert_eq!(x.value, 0.5);
-        assert_eq!(*x.unit.as_ref().unwrap().numer(), vec![METER, HOUR]);
-        assert_eq!(*x.unit.unwrap().denom(), vec![SECOND, MILE]);
+        assert_relative_eq!(x.value, 1.1184681460272012);
+        assert!(x.unit.is_none());
     }
 
     #[test]

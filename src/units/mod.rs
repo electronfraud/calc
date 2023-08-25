@@ -74,7 +74,7 @@ pub static MIL: Base = Base::new("mil", Length, 0.000_304_8 / 12.0);
 pub static YARD: Base = Base::new("yd", Length, 0.3048 * 3.0);
 
 // More masses
-pub static POUND: Base = Base::new("lb", Mass, 0.453_592_37);
+pub static POUND_MASS: Base = Base::new("lbm", Mass, 0.453_592_37);
 pub static OUNCE: Base = Base::new("oz", Mass, 0.028_349_523_125);
 
 // More temperatures
@@ -100,6 +100,12 @@ pub static NEWTON: Lazy<Unit> = Lazy::new(|| {
         .unwrap()
         .with_symbol("N")
 });
+pub static POUND_FORCE: Lazy<Unit> = Lazy::new(|| {
+    Unit::new(&[POUND_MASS, METER], &[SECOND, SECOND])
+        .unwrap()
+        .with_factor(9.80665) // standard acceleration due to Earth's gravity
+        .with_symbol("lbf")
+});
 
 // Power
 pub static WATT: Lazy<Unit> = Lazy::new(|| (&*JOULE / SECOND).unwrap().with_symbol("W"));
@@ -110,8 +116,11 @@ pub static PASCAL: Lazy<Unit> = Lazy::new(|| {
         .unwrap()
         .with_symbol("Pa")
 });
-pub static PSI: Lazy<Unit> =
-    Lazy::new(|| ((POUND / INCH).unwrap() / INCH).unwrap().with_symbol("psi"));
+pub static PSI: Lazy<Unit> = Lazy::new(|| {
+    ((&*POUND_FORCE / INCH).unwrap() / INCH)
+        .unwrap()
+        .with_symbol("psi")
+});
 
 // Electromagnetic
 pub static VOLT: Lazy<Unit> = Lazy::new(|| {
@@ -263,16 +272,16 @@ pub static NANOWATT: Lazy<Unit> = Lazy::new(|| WATT.with_factor(1e-9).with_symbo
 pub static PICOWATT: Lazy<Unit> = Lazy::new(|| WATT.with_factor(1e-12).with_symbol("pW"));
 pub static FEMTOWATT: Lazy<Unit> = Lazy::new(|| WATT.with_factor(1e-15).with_symbol("fW"));
 
-pub static PETAPASCAL: Lazy<Unit> = Lazy::new(|| PASCAL.with_factor(1e15).with_symbol("PP"));
-pub static TERAPASCAL: Lazy<Unit> = Lazy::new(|| PASCAL.with_factor(1e12).with_symbol("TP"));
-pub static GIGAPASCAL: Lazy<Unit> = Lazy::new(|| PASCAL.with_factor(1e9).with_symbol("GP"));
-pub static MEGAPASCAL: Lazy<Unit> = Lazy::new(|| PASCAL.with_factor(1e6).with_symbol("MP"));
-pub static KILOPASCAL: Lazy<Unit> = Lazy::new(|| PASCAL.with_factor(1e3).with_symbol("kP"));
-pub static MILLIPASCAL: Lazy<Unit> = Lazy::new(|| PASCAL.with_factor(1e-3).with_symbol("mP"));
-pub static MICROPASCAL: Lazy<Unit> = Lazy::new(|| PASCAL.with_factor(1e-6).with_symbol("uP"));
-pub static NANOPASCAL: Lazy<Unit> = Lazy::new(|| PASCAL.with_factor(1e-9).with_symbol("nP"));
-pub static PICOPASCAL: Lazy<Unit> = Lazy::new(|| PASCAL.with_factor(1e-12).with_symbol("pP"));
-pub static FEMTOPASCAL: Lazy<Unit> = Lazy::new(|| PASCAL.with_factor(1e-15).with_symbol("fP"));
+pub static PETAPASCAL: Lazy<Unit> = Lazy::new(|| PASCAL.with_factor(1e15).with_symbol("PPa"));
+pub static TERAPASCAL: Lazy<Unit> = Lazy::new(|| PASCAL.with_factor(1e12).with_symbol("TPa"));
+pub static GIGAPASCAL: Lazy<Unit> = Lazy::new(|| PASCAL.with_factor(1e9).with_symbol("GPa"));
+pub static MEGAPASCAL: Lazy<Unit> = Lazy::new(|| PASCAL.with_factor(1e6).with_symbol("MPa"));
+pub static KILOPASCAL: Lazy<Unit> = Lazy::new(|| PASCAL.with_factor(1e3).with_symbol("kPa"));
+pub static MILLIPASCAL: Lazy<Unit> = Lazy::new(|| PASCAL.with_factor(1e-3).with_symbol("mPa"));
+pub static MICROPASCAL: Lazy<Unit> = Lazy::new(|| PASCAL.with_factor(1e-6).with_symbol("uPa"));
+pub static NANOPASCAL: Lazy<Unit> = Lazy::new(|| PASCAL.with_factor(1e-9).with_symbol("nPa"));
+pub static PICOPASCAL: Lazy<Unit> = Lazy::new(|| PASCAL.with_factor(1e-12).with_symbol("pPa"));
+pub static FEMTOPASCAL: Lazy<Unit> = Lazy::new(|| PASCAL.with_factor(1e-15).with_symbol("fPa"));
 
 pub static PETAVOLT: Lazy<Unit> = Lazy::new(|| VOLT.with_factor(1e15).with_symbol("PV"));
 pub static TERAVOLT: Lazy<Unit> = Lazy::new(|| VOLT.with_factor(1e12).with_symbol("TV"));

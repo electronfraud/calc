@@ -14,7 +14,7 @@ UNITS = (
     ('JOULE', 'J', None, 'unit'),
     ('NEWTON', 'N', None, 'unit'),
     ('WATT', 'W', None, 'unit'),
-    ('PASCAL', 'P', None, 'unit'),
+    ('PASCAL', 'Pa', None, 'unit'),
     ('VOLT', 'V', None, 'unit'),
     ('OHM', 'ohm', None, 'unit'),
     ('FARAD', 'F', None, 'unit'),
