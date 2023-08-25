@@ -10,7 +10,16 @@ UNITS = (
     ('KELVIN', 'K', 'Temperature', 'base'),
     ('MOLE', 'mol', 'AmountOfSubstance', 'base'),
     ('CANDELA', 'cd', 'LuminousIntensity', 'base'),
-    ('RADIAN', 'rad', 'Angle', 'base'))
+    ('RADIAN', 'rad', 'Angle', 'base'),
+    ('JOULE', 'J', None, 'unit'),
+    ('NEWTON', 'N', None, 'unit'),
+    ('WATT', 'W', None, 'unit'),
+    ('PASCAL', 'P', None, 'unit'),
+    ('VOLT', 'V', None, 'unit'),
+    ('OHM', 'ohm', None, 'unit'),
+    ('FARAD', 'F', None, 'unit'),
+    ('TESLA', 'T', None, 'unit'))
+
 
 PREFIXES = (
     ('PETA', 'P', '1e15'),
@@ -36,8 +45,7 @@ for name, symbol, physq, kind in UNITS:
         if kind == 'base':
             print(f'pub static {namepfx}{name}: Base = Base::new("{sympfx}{symbol}", {physq}, {factor});')
         else:
-            # TODO
-            pass
+            print(f'pub static {namepfx}{name}: Lazy<Unit> = Lazy::new(|| {name}.with_factor({factor}).with_symbol("{sympfx}{symbol}"));');
     print()
 
 # This section goes in src/builtins.rs

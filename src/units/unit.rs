@@ -26,6 +26,7 @@ pub struct Unit {
     pub symbol: Option<String>,
     numer: Vec<Base>,
     denom: Vec<Base>,
+    factor: f64,
 }
 
 impl Unit {
@@ -51,6 +52,7 @@ impl Unit {
             symbol: None,
             numer: Vec::from(numer),
             denom: Vec::from(denom),
+            factor: 1.0,
         }
         .simplified();
 
@@ -80,6 +82,19 @@ impl Unit {
             symbol: Some(String::from(symbol)),
             numer: self.numer.clone(),
             denom: self.denom.clone(),
+            factor: self.factor,
+        }
+    }
+
+    /// Returns a new `Unit` identical to this one except that it has the given
+    /// factor.
+    #[must_use]
+    pub fn with_factor(&self, factor: f64) -> Self {
+        Unit {
+            symbol: self.symbol.clone(),
+            numer: self.numer.clone(),
+            denom: self.denom.clone(),
+            factor,
         }
     }
 
@@ -124,6 +139,7 @@ impl Unit {
         for base in &self.denom {
             num /= base.factor;
         }
+        num *= self.factor;
 
         // Raise to new unit
         for base in &other.numer {
@@ -135,6 +151,7 @@ impl Unit {
         for base in &other.denom {
             num *= base.factor;
         }
+        num /= other.factor;
 
         Ok(num)
     }
@@ -239,6 +256,7 @@ impl Unit {
             symbol: self.symbol.clone(),
             numer: s_numer,
             denom: s_denom,
+            factor: self.factor,
         }
     }
 }
@@ -395,7 +413,7 @@ mod tests {
     use crate::units::Unit;
     use crate::units::{
         AMPERE, DEG_CELSIUS, DEG_FAHRENHEIT, FOOT, HOUR, KELVIN, KILOGRAM, METER, MILE,
-        NAUTICAL_MILE, RANKINE, SECOND, TEMP_CELSIUS, TEMP_FAHRENHEIT,
+        NAUTICAL_MILE, RANKINE, SECOND, TEMP_CELSIUS, TEMP_FAHRENHEIT, VOLT,
     };
 
     #[test]
@@ -407,6 +425,7 @@ mod tests {
             symbol: Some(String::from("J")),
             numer: vec![KILOGRAM, METER, METER],
             denom: vec![SECOND, SECOND],
+            factor: 1.0,
         };
         assert_eq!(joule.to_string(), "J");
 
@@ -414,6 +433,7 @@ mod tests {
             symbol: None,
             numer: vec![KILOGRAM, METER, METER],
             denom: vec![SECOND, SECOND],
+            factor: 1.0,
         };
         assert_ne!(joule.to_string(), "J");
         assert_eq!(joule.with_symbol("J").to_string(), "J");
@@ -681,5 +701,13 @@ mod tests {
         assert!(u.inverse().is_err());
         let u = Unit::new(&[KELVIN], &[]).unwrap();
         assert!(u.inverse().is_ok());
+    }
+
+    #[test]
+    fn factors() {
+        let millivolt = VOLT.with_factor(0.001).with_symbol("mV");
+        assert_eq!(VOLT.convert(1.0, &millivolt).unwrap(), 1000.0);
+        let kilovolt = VOLT.with_factor(1000.0).with_symbol("kV");
+        assert_eq!(millivolt.convert(1.0, &kilovolt).unwrap(), 0.000001);
     }
 }

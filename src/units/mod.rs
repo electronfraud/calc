@@ -113,6 +113,34 @@ pub static PASCAL: Lazy<Unit> = Lazy::new(|| {
 pub static PSI: Lazy<Unit> =
     Lazy::new(|| ((POUND / INCH).unwrap() / INCH).unwrap().with_symbol("psi"));
 
+// Electromagnetic
+pub static VOLT: Lazy<Unit> = Lazy::new(|| {
+    Unit::new(&[KILOGRAM, METER, METER], &[SECOND, SECOND, SECOND, AMPERE])
+        .unwrap()
+        .with_symbol("V")
+});
+pub static OHM: Lazy<Unit> = Lazy::new(|| {
+    Unit::new(
+        &[KILOGRAM, METER, METER],
+        &[SECOND, SECOND, SECOND, AMPERE, AMPERE],
+    )
+    .unwrap()
+    .with_symbol("ohm")
+});
+pub static FARAD: Lazy<Unit> = Lazy::new(|| {
+    Unit::new(
+        &[SECOND, SECOND, SECOND, SECOND, AMPERE, AMPERE],
+        &[KILOGRAM, METER, METER],
+    )
+    .unwrap()
+    .with_symbol("F")
+});
+pub static TESLA: Lazy<Unit> = Lazy::new(|| {
+    Unit::new(&[KILOGRAM], &[SECOND, SECOND, AMPERE])
+        .unwrap()
+        .with_symbol("T")
+});
+
 // SI prefixes
 pub static PETASECOND: Base = Base::new("Ps", Time, 1e15);
 pub static TERASECOND: Base = Base::new("Ts", Time, 1e12);
@@ -201,3 +229,91 @@ pub static MICRORADIAN: Base = Base::new("urad", Angle, 1e-6);
 pub static NANORADIAN: Base = Base::new("nrad", Angle, 1e-9);
 pub static PICORADIAN: Base = Base::new("prad", Angle, 1e-12);
 pub static FEMTORADIAN: Base = Base::new("frad", Angle, 1e-15);
+
+pub static PETAJOULE: Lazy<Unit> = Lazy::new(|| JOULE.with_factor(1e15).with_symbol("PJ"));
+pub static TERAJOULE: Lazy<Unit> = Lazy::new(|| JOULE.with_factor(1e12).with_symbol("TJ"));
+pub static GIGAJOULE: Lazy<Unit> = Lazy::new(|| JOULE.with_factor(1e9).with_symbol("GJ"));
+pub static MEGAJOULE: Lazy<Unit> = Lazy::new(|| JOULE.with_factor(1e6).with_symbol("MJ"));
+pub static KILOJOULE: Lazy<Unit> = Lazy::new(|| JOULE.with_factor(1e3).with_symbol("kJ"));
+pub static MILLIJOULE: Lazy<Unit> = Lazy::new(|| JOULE.with_factor(1e-3).with_symbol("mJ"));
+pub static MICROJOULE: Lazy<Unit> = Lazy::new(|| JOULE.with_factor(1e-6).with_symbol("uJ"));
+pub static NANOJOULE: Lazy<Unit> = Lazy::new(|| JOULE.with_factor(1e-9).with_symbol("nJ"));
+pub static PICOJOULE: Lazy<Unit> = Lazy::new(|| JOULE.with_factor(1e-12).with_symbol("pJ"));
+pub static FEMTOJOULE: Lazy<Unit> = Lazy::new(|| JOULE.with_factor(1e-15).with_symbol("fJ"));
+
+pub static PETANEWTON: Lazy<Unit> = Lazy::new(|| NEWTON.with_factor(1e15).with_symbol("PN"));
+pub static TERANEWTON: Lazy<Unit> = Lazy::new(|| NEWTON.with_factor(1e12).with_symbol("TN"));
+pub static GIGANEWTON: Lazy<Unit> = Lazy::new(|| NEWTON.with_factor(1e9).with_symbol("GN"));
+pub static MEGANEWTON: Lazy<Unit> = Lazy::new(|| NEWTON.with_factor(1e6).with_symbol("MN"));
+pub static KILONEWTON: Lazy<Unit> = Lazy::new(|| NEWTON.with_factor(1e3).with_symbol("kN"));
+pub static MILLINEWTON: Lazy<Unit> = Lazy::new(|| NEWTON.with_factor(1e-3).with_symbol("mN"));
+pub static MICRONEWTON: Lazy<Unit> = Lazy::new(|| NEWTON.with_factor(1e-6).with_symbol("uN"));
+pub static NANONEWTON: Lazy<Unit> = Lazy::new(|| NEWTON.with_factor(1e-9).with_symbol("nN"));
+pub static PICONEWTON: Lazy<Unit> = Lazy::new(|| NEWTON.with_factor(1e-12).with_symbol("pN"));
+pub static FEMTONEWTON: Lazy<Unit> = Lazy::new(|| NEWTON.with_factor(1e-15).with_symbol("fN"));
+
+pub static PETAWATT: Lazy<Unit> = Lazy::new(|| WATT.with_factor(1e15).with_symbol("PW"));
+pub static TERAWATT: Lazy<Unit> = Lazy::new(|| WATT.with_factor(1e12).with_symbol("TW"));
+pub static GIGAWATT: Lazy<Unit> = Lazy::new(|| WATT.with_factor(1e9).with_symbol("GW"));
+pub static MEGAWATT: Lazy<Unit> = Lazy::new(|| WATT.with_factor(1e6).with_symbol("MW"));
+pub static KILOWATT: Lazy<Unit> = Lazy::new(|| WATT.with_factor(1e3).with_symbol("kW"));
+pub static MILLIWATT: Lazy<Unit> = Lazy::new(|| WATT.with_factor(1e-3).with_symbol("mW"));
+pub static MICROWATT: Lazy<Unit> = Lazy::new(|| WATT.with_factor(1e-6).with_symbol("uW"));
+pub static NANOWATT: Lazy<Unit> = Lazy::new(|| WATT.with_factor(1e-9).with_symbol("nW"));
+pub static PICOWATT: Lazy<Unit> = Lazy::new(|| WATT.with_factor(1e-12).with_symbol("pW"));
+pub static FEMTOWATT: Lazy<Unit> = Lazy::new(|| WATT.with_factor(1e-15).with_symbol("fW"));
+
+pub static PETAPASCAL: Lazy<Unit> = Lazy::new(|| PASCAL.with_factor(1e15).with_symbol("PP"));
+pub static TERAPASCAL: Lazy<Unit> = Lazy::new(|| PASCAL.with_factor(1e12).with_symbol("TP"));
+pub static GIGAPASCAL: Lazy<Unit> = Lazy::new(|| PASCAL.with_factor(1e9).with_symbol("GP"));
+pub static MEGAPASCAL: Lazy<Unit> = Lazy::new(|| PASCAL.with_factor(1e6).with_symbol("MP"));
+pub static KILOPASCAL: Lazy<Unit> = Lazy::new(|| PASCAL.with_factor(1e3).with_symbol("kP"));
+pub static MILLIPASCAL: Lazy<Unit> = Lazy::new(|| PASCAL.with_factor(1e-3).with_symbol("mP"));
+pub static MICROPASCAL: Lazy<Unit> = Lazy::new(|| PASCAL.with_factor(1e-6).with_symbol("uP"));
+pub static NANOPASCAL: Lazy<Unit> = Lazy::new(|| PASCAL.with_factor(1e-9).with_symbol("nP"));
+pub static PICOPASCAL: Lazy<Unit> = Lazy::new(|| PASCAL.with_factor(1e-12).with_symbol("pP"));
+pub static FEMTOPASCAL: Lazy<Unit> = Lazy::new(|| PASCAL.with_factor(1e-15).with_symbol("fP"));
+
+pub static PETAVOLT: Lazy<Unit> = Lazy::new(|| VOLT.with_factor(1e15).with_symbol("PV"));
+pub static TERAVOLT: Lazy<Unit> = Lazy::new(|| VOLT.with_factor(1e12).with_symbol("TV"));
+pub static GIGAVOLT: Lazy<Unit> = Lazy::new(|| VOLT.with_factor(1e9).with_symbol("GV"));
+pub static MEGAVOLT: Lazy<Unit> = Lazy::new(|| VOLT.with_factor(1e6).with_symbol("MV"));
+pub static KILOVOLT: Lazy<Unit> = Lazy::new(|| VOLT.with_factor(1e3).with_symbol("kV"));
+pub static MILLIVOLT: Lazy<Unit> = Lazy::new(|| VOLT.with_factor(1e-3).with_symbol("mV"));
+pub static MICROVOLT: Lazy<Unit> = Lazy::new(|| VOLT.with_factor(1e-6).with_symbol("uV"));
+pub static NANOVOLT: Lazy<Unit> = Lazy::new(|| VOLT.with_factor(1e-9).with_symbol("nV"));
+pub static PICOVOLT: Lazy<Unit> = Lazy::new(|| VOLT.with_factor(1e-12).with_symbol("pV"));
+pub static FEMTOVOLT: Lazy<Unit> = Lazy::new(|| VOLT.with_factor(1e-15).with_symbol("fV"));
+
+pub static PETAOHM: Lazy<Unit> = Lazy::new(|| OHM.with_factor(1e15).with_symbol("Pohm"));
+pub static TERAOHM: Lazy<Unit> = Lazy::new(|| OHM.with_factor(1e12).with_symbol("Tohm"));
+pub static GIGAOHM: Lazy<Unit> = Lazy::new(|| OHM.with_factor(1e9).with_symbol("Gohm"));
+pub static MEGAOHM: Lazy<Unit> = Lazy::new(|| OHM.with_factor(1e6).with_symbol("Mohm"));
+pub static KILOOHM: Lazy<Unit> = Lazy::new(|| OHM.with_factor(1e3).with_symbol("kohm"));
+pub static MILLIOHM: Lazy<Unit> = Lazy::new(|| OHM.with_factor(1e-3).with_symbol("mohm"));
+pub static MICROOHM: Lazy<Unit> = Lazy::new(|| OHM.with_factor(1e-6).with_symbol("uohm"));
+pub static NANOOHM: Lazy<Unit> = Lazy::new(|| OHM.with_factor(1e-9).with_symbol("nohm"));
+pub static PICOOHM: Lazy<Unit> = Lazy::new(|| OHM.with_factor(1e-12).with_symbol("pohm"));
+pub static FEMTOOHM: Lazy<Unit> = Lazy::new(|| OHM.with_factor(1e-15).with_symbol("fohm"));
+
+pub static PETAFARAD: Lazy<Unit> = Lazy::new(|| FARAD.with_factor(1e15).with_symbol("PF"));
+pub static TERAFARAD: Lazy<Unit> = Lazy::new(|| FARAD.with_factor(1e12).with_symbol("TF"));
+pub static GIGAFARAD: Lazy<Unit> = Lazy::new(|| FARAD.with_factor(1e9).with_symbol("GF"));
+pub static MEGAFARAD: Lazy<Unit> = Lazy::new(|| FARAD.with_factor(1e6).with_symbol("MF"));
+pub static KILOFARAD: Lazy<Unit> = Lazy::new(|| FARAD.with_factor(1e3).with_symbol("kF"));
+pub static MILLIFARAD: Lazy<Unit> = Lazy::new(|| FARAD.with_factor(1e-3).with_symbol("mF"));
+pub static MICROFARAD: Lazy<Unit> = Lazy::new(|| FARAD.with_factor(1e-6).with_symbol("uF"));
+pub static NANOFARAD: Lazy<Unit> = Lazy::new(|| FARAD.with_factor(1e-9).with_symbol("nF"));
+pub static PICOFARAD: Lazy<Unit> = Lazy::new(|| FARAD.with_factor(1e-12).with_symbol("pF"));
+pub static FEMTOFARAD: Lazy<Unit> = Lazy::new(|| FARAD.with_factor(1e-15).with_symbol("fF"));
+
+pub static PETATESLA: Lazy<Unit> = Lazy::new(|| TESLA.with_factor(1e15).with_symbol("PT"));
+pub static TERATESLA: Lazy<Unit> = Lazy::new(|| TESLA.with_factor(1e12).with_symbol("TT"));
+pub static GIGATESLA: Lazy<Unit> = Lazy::new(|| TESLA.with_factor(1e9).with_symbol("GT"));
+pub static MEGATESLA: Lazy<Unit> = Lazy::new(|| TESLA.with_factor(1e6).with_symbol("MT"));
+pub static KILOTESLA: Lazy<Unit> = Lazy::new(|| TESLA.with_factor(1e3).with_symbol("kT"));
+pub static MILLITESLA: Lazy<Unit> = Lazy::new(|| TESLA.with_factor(1e-3).with_symbol("mT"));
+pub static MICROTESLA: Lazy<Unit> = Lazy::new(|| TESLA.with_factor(1e-6).with_symbol("uT"));
+pub static NANOTESLA: Lazy<Unit> = Lazy::new(|| TESLA.with_factor(1e-9).with_symbol("nT"));
+pub static PICOTESLA: Lazy<Unit> = Lazy::new(|| TESLA.with_factor(1e-12).with_symbol("pT"));
+pub static FEMTOTESLA: Lazy<Unit> = Lazy::new(|| TESLA.with_factor(1e-15).with_symbol("fT"));
