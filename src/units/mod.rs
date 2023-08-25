@@ -71,6 +71,11 @@ pub static FOOT: Base = Base::new("ft", Length, 0.3048);
 pub static MILE: Base = Base::new("mi", Length, 1609.344);
 pub static NAUTICAL_MILE: Base = Base::new("NM", Length, 1852.0);
 pub static MIL: Base = Base::new("mil", Length, 0.000_304_8 / 12.0);
+pub static YARD: Base = Base::new("yd", Length, 0.3048 * 3.0);
+
+// More masses
+pub static POUND: Base = Base::new("lb", Mass, 0.453_592_37);
+pub static OUNCE: Base = Base::new("oz", Mass, 0.028_349_523_125);
 
 // More temperatures
 pub static RANKINE: Base = Base::new("R", Temperature, 5.0 / 9.0);
@@ -98,6 +103,15 @@ pub static NEWTON: Lazy<Unit> = Lazy::new(|| {
 
 // Power
 pub static WATT: Lazy<Unit> = Lazy::new(|| (&*JOULE / SECOND).unwrap().with_symbol("W"));
+
+// Pressure
+pub static PASCAL: Lazy<Unit> = Lazy::new(|| {
+    ((&*NEWTON / METER).unwrap() / METER)
+        .unwrap()
+        .with_symbol("Pa")
+});
+pub static PSI: Lazy<Unit> =
+    Lazy::new(|| ((POUND / INCH).unwrap() / INCH).unwrap().with_symbol("psi"));
 
 // SI prefixes
 pub static PETASECOND: Base = Base::new("Ps", Time, 1e15);

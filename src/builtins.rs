@@ -689,6 +689,10 @@ pub fn table() -> Table {
         base!(units::MILE),
         base!(units::NAUTICAL_MILE),
         base!(units::MIL),
+        base!(units::YARD),
+        // Mass
+        base!(units::POUND),
+        base!(units::OUNCE),
         // Temperature
         base!(units::RANKINE),
         base!(units::DEG_CELSIUS),
@@ -703,6 +707,9 @@ pub fn table() -> Table {
         unit!(&*units::JOULE),
         // Power
         unit!(&*units::WATT),
+        // Pressure
+        unit!(&*units::PASCAL),
+        unit!(&*units::PSI),
         // SI prefixes
         base!(units::PETASECOND),
         base!(units::TERASECOND),
