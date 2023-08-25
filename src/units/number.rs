@@ -74,8 +74,8 @@ impl Number {
         } else if other.value == 0.0 {
             Ok(Number::new(1.0))
         } else {
-            let mut numer: Vec<&Base> = Vec::new();
-            let mut denom: Vec<&Base> = Vec::new();
+            let mut numer: Vec<Base> = Vec::new();
+            let mut denom: Vec<Base> = Vec::new();
 
             // this will always succeed but i'd rather not use unwrap() and
             // have to allow missing panics docs in case a real panic gets
@@ -114,8 +114,8 @@ impl Number {
         } else if !other.is_whole() {
             Err(Error::DegreeNotAnInteger)
         } else {
-            let mut numer: Vec<&Base> = Vec::new();
-            let mut denom: Vec<&Base> = Vec::new();
+            let mut numer: Vec<Base> = Vec::new();
+            let mut denom: Vec<Base> = Vec::new();
             #[allow(clippy::cast_possible_truncation)] // already tested for wholeness
             let degree = other.value as isize;
             let abs_degree = degree.unsigned_abs();
@@ -150,15 +150,15 @@ impl Number {
 /// Helper for `roots`. Counts the number of times each unique base appears in
 /// `bases`. Returns parallel vectors containing de-duplicated `bases` and the
 /// number of times each base appears in `bases`.
-fn base_counts(bases: &[&'static Base]) -> (Vec<&'static Base>, Vec<usize>) {
-    let mut uniq_bases: Vec<&'static Base> = Vec::new();
+fn base_counts(bases: &[Base]) -> (Vec<Base>, Vec<usize>) {
+    let mut uniq_bases: Vec<Base> = Vec::new();
     let mut counts: Vec<usize> = Vec::new();
 
     for base in bases {
         if let Some((ix, _)) = uniq_bases.iter().find_position(|&b| b == base) {
             counts[ix] += 1;
         } else {
-            uniq_bases.push(base);
+            uniq_bases.push(*base);
             counts.push(1);
         }
     }
@@ -168,12 +168,8 @@ fn base_counts(bases: &[&'static Base]) -> (Vec<&'static Base>, Vec<usize>) {
 
 /// Helper for `roots`. Takes parallel vectors `bases` and `counts` and returns
 /// a vector with each base `bases[n]` appearing `counts[n]` / `divisor` times.
-fn divide_base_counts(
-    bases: &[&'static Base],
-    counts: &[usize],
-    divisor: usize,
-) -> Vec<&'static Base> {
-    let mut result: Vec<&'static Base> = Vec::new();
+fn divide_base_counts(bases: &[Base], counts: &[usize], divisor: usize) -> Vec<Base> {
+    let mut result: Vec<Base> = Vec::new();
     for ix in 0..bases.len() {
         for _ in 0..(counts[ix] / divisor) {
             result.push(bases[ix]);
@@ -356,30 +352,30 @@ mod tests {
 
     #[test]
     fn dimensionless_added_to_number_with_unit() {
-        let result = &Number::new(5.0) + &Number::new(10.0).with_unit((&METER / &SECOND).unwrap());
+        let result = &Number::new(5.0) + &Number::new(10.0).with_unit((METER / SECOND).unwrap());
         assert!(result.is_err());
     }
 
     #[test]
     fn number_with_unit_added_to_dimensionless() {
-        let result = &Number::new(10.0).with_unit((&METER / &SECOND).unwrap()) + &Number::new(5.0);
+        let result = &Number::new(10.0).with_unit((METER / SECOND).unwrap()) + &Number::new(5.0);
         assert!(result.is_err());
     }
 
     #[test]
     fn number_with_unit_added_to_compatible_number_with_unit() {
-        let x = (&Number::new(10.0).with_unit((&METER / &SECOND).unwrap())
-            + &Number::new(5.0).with_unit((&MILE / &HOUR).unwrap()))
+        let x = (&Number::new(10.0).with_unit((METER / SECOND).unwrap())
+            + &Number::new(5.0).with_unit((MILE / HOUR).unwrap()))
             .unwrap();
         assert_eq!(x.value, 12.235199999999999);
-        assert_eq!(*x.unit.as_ref().unwrap().numer(), vec![&METER]);
-        assert_eq!(*x.unit.unwrap().denom(), vec![&SECOND]);
+        assert_eq!(*x.unit.as_ref().unwrap().numer(), vec![METER]);
+        assert_eq!(*x.unit.unwrap().denom(), vec![SECOND]);
     }
 
     #[test]
     fn number_with_unit_added_to_incompatible_number_with_unit() {
-        let result = &Number::new(10.0).with_unit((&METER / &SECOND).unwrap())
-            + &Number::new(5.0).with_unit((&MILE / &KILOGRAM).unwrap());
+        let result = &Number::new(10.0).with_unit((METER / SECOND).unwrap())
+            + &Number::new(5.0).with_unit((MILE / KILOGRAM).unwrap());
         assert!(result.is_err());
     }
 
@@ -392,30 +388,30 @@ mod tests {
 
     #[test]
     fn number_with_unit_subtracted_from_dimensionless() {
-        let result = &Number::new(5.0) - &Number::new(10.0).with_unit((&METER / &SECOND).unwrap());
+        let result = &Number::new(5.0) - &Number::new(10.0).with_unit((METER / SECOND).unwrap());
         assert!(result.is_err());
     }
 
     #[test]
     fn dimensionless_subtracted_from_number_with_unit() {
-        let result = &Number::new(10.0).with_unit((&METER / &SECOND).unwrap()) - &Number::new(5.0);
+        let result = &Number::new(10.0).with_unit((METER / SECOND).unwrap()) - &Number::new(5.0);
         assert!(result.is_err());
     }
 
     #[test]
     fn number_with_unit_subtracted_from_compatible_number_with_unit() {
-        let x = (&Number::new(10.0).with_unit((&METER / &SECOND).unwrap())
-            - &Number::new(5.0).with_unit((&MILE / &HOUR).unwrap()))
+        let x = (&Number::new(10.0).with_unit((METER / SECOND).unwrap())
+            - &Number::new(5.0).with_unit((MILE / HOUR).unwrap()))
             .unwrap();
         assert_eq!(x.value, 7.7648);
-        assert_eq!(*x.unit.as_ref().unwrap().numer(), vec![&METER]);
-        assert_eq!(*x.unit.unwrap().denom(), vec![&SECOND]);
+        assert_eq!(*x.unit.as_ref().unwrap().numer(), vec![METER]);
+        assert_eq!(*x.unit.unwrap().denom(), vec![SECOND]);
     }
 
     #[test]
     fn number_with_unit_subtracted_from_incompatible_number_with_unit() {
-        let result = &Number::new(10.0).with_unit((&METER / &SECOND).unwrap())
-            - &Number::new(5.0).with_unit((&MILE / &KILOGRAM).unwrap());
+        let result = &Number::new(10.0).with_unit((METER / SECOND).unwrap())
+            - &Number::new(5.0).with_unit((MILE / KILOGRAM).unwrap());
         assert!(result.is_err());
     }
 
@@ -428,53 +424,53 @@ mod tests {
 
     #[test]
     fn dimensionless_multiplied_by_number_with_unit() {
-        let x = (&Number::new(5.0) * &Number::new(10.0).with_unit((&METER / &SECOND).unwrap()))
-            .unwrap();
+        let x =
+            (&Number::new(5.0) * &Number::new(10.0).with_unit((METER / SECOND).unwrap())).unwrap();
         assert_eq!(x.value, 50.0);
-        assert_eq!(*x.unit.as_ref().unwrap().numer(), vec![&METER]);
-        assert_eq!(*x.unit.unwrap().denom(), vec![&SECOND]);
+        assert_eq!(*x.unit.as_ref().unwrap().numer(), vec![METER]);
+        assert_eq!(*x.unit.unwrap().denom(), vec![SECOND]);
     }
 
     #[test]
     fn number_with_unit_multiplied_by_dimensionless() {
-        let x = (&Number::new(5.0).with_unit((&METER / &SECOND).unwrap()) * &Number::new(10.0))
-            .unwrap();
+        let x =
+            (&Number::new(5.0).with_unit((METER / SECOND).unwrap()) * &Number::new(10.0)).unwrap();
         assert_eq!(x.value, 50.0);
-        assert_eq!(*x.unit.as_ref().unwrap().numer(), vec![&METER]);
-        assert_eq!(*x.unit.unwrap().denom(), vec![&SECOND]);
+        assert_eq!(*x.unit.as_ref().unwrap().numer(), vec![METER]);
+        assert_eq!(*x.unit.unwrap().denom(), vec![SECOND]);
     }
 
     #[test]
     fn number_with_unit_multiplied_by_number_with_unit() {
-        let x = (&Number::new(5.0).with_unit((&METER / &SECOND).unwrap())
-            * &Number::new(10.0).with_unit((&MILE / &HOUR).unwrap()))
+        let x = (&Number::new(5.0).with_unit((METER / SECOND).unwrap())
+            * &Number::new(10.0).with_unit((MILE / HOUR).unwrap()))
             .unwrap();
         assert_eq!(x.value, 50.0);
-        assert_eq!(*x.unit.as_ref().unwrap().numer(), vec![&METER, &MILE]);
-        assert_eq!(*x.unit.unwrap().denom(), vec![&SECOND, &HOUR]);
+        assert_eq!(*x.unit.as_ref().unwrap().numer(), vec![METER, MILE]);
+        assert_eq!(*x.unit.unwrap().denom(), vec![SECOND, HOUR]);
     }
 
     #[test]
     fn dimensionless_multiplied_by_unit() {
-        let x = (&Number::new(5.0) * &(&MILE / &HOUR).unwrap()).unwrap();
+        let x = (&Number::new(5.0) * &(MILE / HOUR).unwrap()).unwrap();
         assert_eq!(x.value, 5.0);
-        assert_eq!(*x.unit.as_ref().unwrap().numer(), vec![&MILE]);
-        assert_eq!(*x.unit.unwrap().denom(), vec![&HOUR]);
+        assert_eq!(*x.unit.as_ref().unwrap().numer(), vec![MILE]);
+        assert_eq!(*x.unit.unwrap().denom(), vec![HOUR]);
     }
 
     #[test]
     fn number_with_unit_multiplied_by_unit() {
-        let x = (&Number::new(5.0).with_unit(((&MILE * &HOUR).unwrap() / &KILOGRAM).unwrap())
-            * &(&MILE / &HOUR).unwrap())
+        let x = (&Number::new(5.0).with_unit(((MILE * HOUR).unwrap() / KILOGRAM).unwrap())
+            * &(MILE / HOUR).unwrap())
             .unwrap();
         assert_eq!(x.value, 5.0);
-        assert_eq!(*x.unit.as_ref().unwrap().numer(), vec![&MILE, &MILE]);
-        assert_eq!(*x.unit.unwrap().denom(), vec![&KILOGRAM]);
+        assert_eq!(*x.unit.as_ref().unwrap().numer(), vec![MILE, MILE]);
+        assert_eq!(*x.unit.unwrap().denom(), vec![KILOGRAM]);
     }
 
     #[test]
     fn number_with_unit_multiplied_by_temperature() {
-        let x = &Number::new(5.0).with_unit(((&MILE * &HOUR).unwrap() / &KILOGRAM).unwrap())
+        let x = &Number::new(5.0).with_unit(((MILE * HOUR).unwrap() / KILOGRAM).unwrap())
             * &TEMP_CELSIUS.as_unit();
         assert!(x.is_err());
     }
@@ -488,53 +484,53 @@ mod tests {
 
     #[test]
     fn dimensionless_divided_by_number_with_unit() {
-        let x = (&Number::new(5.0) / &Number::new(10.0).with_unit((&METER / &SECOND).unwrap()))
-            .unwrap();
+        let x =
+            (&Number::new(5.0) / &Number::new(10.0).with_unit((METER / SECOND).unwrap())).unwrap();
         assert_eq!(x.value, 0.5);
-        assert_eq!(*x.unit.as_ref().unwrap().numer(), vec![&SECOND]);
-        assert_eq!(*x.unit.unwrap().denom(), vec![&METER]);
+        assert_eq!(*x.unit.as_ref().unwrap().numer(), vec![SECOND]);
+        assert_eq!(*x.unit.unwrap().denom(), vec![METER]);
     }
 
     #[test]
     fn number_with_unit_divided_by_dimensionless() {
-        let x = (&Number::new(5.0).with_unit((&METER / &SECOND).unwrap()) / &Number::new(10.0))
-            .unwrap();
+        let x =
+            (&Number::new(5.0).with_unit((METER / SECOND).unwrap()) / &Number::new(10.0)).unwrap();
         assert_eq!(x.value, 0.5);
-        assert_eq!(*x.unit.as_ref().unwrap().numer(), vec![&METER]);
-        assert_eq!(*x.unit.unwrap().denom(), vec![&SECOND]);
+        assert_eq!(*x.unit.as_ref().unwrap().numer(), vec![METER]);
+        assert_eq!(*x.unit.unwrap().denom(), vec![SECOND]);
     }
 
     #[test]
     fn number_with_unit_divided_by_number_with_unit() {
-        let x = (&Number::new(5.0).with_unit((&METER / &SECOND).unwrap())
-            / &Number::new(10.0).with_unit((&MILE / &HOUR).unwrap()))
+        let x = (&Number::new(5.0).with_unit((METER / SECOND).unwrap())
+            / &Number::new(10.0).with_unit((MILE / HOUR).unwrap()))
             .unwrap();
         assert_eq!(x.value, 0.5);
-        assert_eq!(*x.unit.as_ref().unwrap().numer(), vec![&METER, &HOUR]);
-        assert_eq!(*x.unit.unwrap().denom(), vec![&SECOND, &MILE]);
+        assert_eq!(*x.unit.as_ref().unwrap().numer(), vec![METER, HOUR]);
+        assert_eq!(*x.unit.unwrap().denom(), vec![SECOND, MILE]);
     }
 
     #[test]
     fn dimensionless_divided_by_unit() {
-        let x = (&Number::new(5.0) / &(&MILE / &HOUR).unwrap()).unwrap();
+        let x = (&Number::new(5.0) / &(MILE / HOUR).unwrap()).unwrap();
         assert_eq!(x.value, 5.0);
-        assert_eq!(*x.unit.as_ref().unwrap().numer(), vec![&HOUR]);
-        assert_eq!(*x.unit.unwrap().denom(), vec![&MILE]);
+        assert_eq!(*x.unit.as_ref().unwrap().numer(), vec![HOUR]);
+        assert_eq!(*x.unit.unwrap().denom(), vec![MILE]);
     }
 
     #[test]
     fn number_with_unit_divided_by_unit() {
-        let x = (&Number::new(5.0).with_unit(((&MILE * &HOUR).unwrap() / &KILOGRAM).unwrap())
-            / &(&MILE / &HOUR).unwrap())
+        let x = (&Number::new(5.0).with_unit(((MILE * HOUR).unwrap() / KILOGRAM).unwrap())
+            / &(MILE / HOUR).unwrap())
             .unwrap();
         assert_eq!(x.value, 5.0);
-        assert_eq!(*x.unit.as_ref().unwrap().numer(), vec![&HOUR, &HOUR]);
-        assert_eq!(*x.unit.unwrap().denom(), vec![&KILOGRAM]);
+        assert_eq!(*x.unit.as_ref().unwrap().numer(), vec![HOUR, HOUR]);
+        assert_eq!(*x.unit.unwrap().denom(), vec![KILOGRAM]);
     }
 
     #[test]
     fn number_with_unit_divided_by_temperature() {
-        let x = &Number::new(5.0).with_unit(((&MILE * &HOUR).unwrap() / &KILOGRAM).unwrap())
+        let x = &Number::new(5.0).with_unit(((MILE * HOUR).unwrap() / KILOGRAM).unwrap())
             / &TEMP_CELSIUS.as_unit();
         assert!(x.is_err());
     }
@@ -608,7 +604,7 @@ mod tests {
 
     #[test]
     fn display_with_units_with_exponent_format() {
-        let u = (&METER / &SECOND).unwrap();
+        let u = (METER / SECOND).unwrap();
         // six decimal places max
         assert_eq!(
             Number::new(0.000898359204909915)
@@ -681,7 +677,7 @@ mod tests {
 
     #[test]
     fn display_with_units_with_decimal_format() {
-        let u = (&METER / &SECOND).unwrap();
+        let u = (METER / SECOND).unwrap();
         // make sure the basics work
         assert_eq!(
             Number::new(0.0).with_unit(u.clone()).to_string(),
@@ -759,7 +755,7 @@ mod tests {
         assert_eq!(Number::new(f64::INFINITY).to_string(), "inf");
         assert_eq!(Number::new(f64::NEG_INFINITY).to_string(), "-inf");
         // again, but with units
-        let u = (&METER / &SECOND).unwrap();
+        let u = (METER / SECOND).unwrap();
         assert_eq!(
             Number::new(f64::NAN).with_unit(u.clone()).to_string(),
             "[NaN m⋅s⁻¹]"
@@ -791,24 +787,21 @@ mod tests {
 
     #[test]
     fn pow_with_base_with_units_and_dimensionless_exponent() {
-        let a = Number::new(30.149042744979106).with_unit((&METER / &SECOND).unwrap());
+        let a = Number::new(30.149042744979106).with_unit((METER / SECOND).unwrap());
         let b = Number::new(2.0);
         let c = a.pow(&b).unwrap();
         assert_eq!(c.value, 908.9647784385772);
-        assert_eq!(c.unit.clone().unwrap().numer(), &[&METER, &METER]);
-        assert_eq!(c.unit.unwrap().denom(), &[&SECOND, &SECOND]);
+        assert_eq!(c.unit.clone().unwrap().numer(), &[METER, METER]);
+        assert_eq!(c.unit.unwrap().denom(), &[SECOND, SECOND]);
 
-        let a = Number::new(8.21496240576195).with_unit((&METER / &SECOND).unwrap());
+        let a = Number::new(8.21496240576195).with_unit((METER / SECOND).unwrap());
         let b = Number::new(-3.0);
         let c = a.pow(&b).unwrap();
         assert_eq!(c.value, 0.001803778720105492);
-        assert_eq!(
-            c.unit.clone().unwrap().numer(),
-            &[&SECOND, &SECOND, &SECOND]
-        );
-        assert_eq!(c.unit.unwrap().denom(), &[&METER, &METER, &METER]);
+        assert_eq!(c.unit.clone().unwrap().numer(), &[SECOND, SECOND, SECOND]);
+        assert_eq!(c.unit.unwrap().denom(), &[METER, METER, METER]);
 
-        let a = Number::new(23.283172195086944).with_unit((&METER / &SECOND).unwrap());
+        let a = Number::new(23.283172195086944).with_unit((METER / SECOND).unwrap());
         let b = Number::new(0.0);
         let c = a.pow(&b).unwrap();
         assert_eq!(c.value, 1.0);

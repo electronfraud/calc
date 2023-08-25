@@ -32,7 +32,7 @@ pub use unit::Unit;
 pub enum Error {
     IncommensurableUnits(Option<Box<Unit>>, Option<Box<Unit>>),
     UninvertableUnits(Box<Unit>),
-    NonzeroZeroPoint(&'static Base),
+    NonzeroZeroPoint(Base),
     ExponentHasUnits,
     ExponentNotAnInteger,
     DegreeHasUnits,
@@ -52,7 +52,7 @@ pub static KILOGRAM: Base = Base::new("kg", Mass, 1.0);
 /// SI base unit for electric current
 pub static AMPERE: Base = Base::new("A", Current, 1.0);
 /// SI base unit for thermodynamic temperature
-pub static KELVIN: Base = Base::new("K", Temperature, 1.0).with_zero(0.0);
+pub static KELVIN: Base = Base::new("K", Temperature, 1.0);
 /// SI base unit for amount of substance
 pub static MOLE: Base = Base::new("mol", AmountOfSubstance, 1.0);
 /// SI base unit for luminous intensity
@@ -66,9 +66,6 @@ pub static HOUR: Base = Base::new("hr", Time, 3600.0);
 pub static MINUTE: Base = Base::new("min", Time, 60.0);
 
 // More lengths
-pub static CENTIMETER: Base = Base::new("cm", Length, 0.01);
-pub static MILLIMETER: Base = Base::new("mm", Length, 0.001);
-
 pub static INCH: Base = Base::new("in", Length, 0.3048 / 12.0);
 pub static FOOT: Base = Base::new("ft", Length, 0.3048);
 pub static MILE: Base = Base::new("mi", Length, 1609.344);
@@ -76,9 +73,9 @@ pub static NAUTICAL_MILE: Base = Base::new("NM", Length, 1852.0);
 pub static MIL: Base = Base::new("mil", Length, 0.000_304_8 / 12.0);
 
 // More temperatures
-pub static DEG_CELSIUS: Base = Base::new("degC", Temperature, 1.0);
-pub static DEG_FAHRENHEIT: Base = Base::new("degF", Temperature, 5.0 / 9.0);
-pub static RANKINE: Base = Base::new("R", Temperature, 5.0 / 9.0).with_zero(0.0);
+pub static RANKINE: Base = Base::new("R", Temperature, 5.0 / 9.0);
+pub static DEG_CELSIUS: Base = Base::new("degC", Temperature, 1.0).without_zero();
+pub static DEG_FAHRENHEIT: Base = Base::new("degF", Temperature, 5.0 / 9.0).without_zero();
 pub static TEMP_CELSIUS: Base = Base::new("tempC", Temperature, 1.0).with_zero(-273.15);
 pub static TEMP_FAHRENHEIT: Base = Base::new("tempF", Temperature, 5.0 / 9.0).with_zero(-459.67);
 
@@ -87,17 +84,106 @@ pub static DEGREE: Base = Base::new("deg", Angle, std::f64::consts::PI / 180.0);
 
 // Energy
 pub static JOULE: Lazy<Unit> = Lazy::new(|| {
-    Unit::new(&[&KILOGRAM, &METER, &METER], &[&SECOND, &SECOND])
+    Unit::new(&[KILOGRAM, METER, METER], &[SECOND, SECOND])
         .unwrap()
         .with_symbol("J")
 });
 
 // Force
 pub static NEWTON: Lazy<Unit> = Lazy::new(|| {
-    Unit::new(&[&KILOGRAM, &METER], &[&SECOND, &SECOND])
+    Unit::new(&[KILOGRAM, METER], &[SECOND, SECOND])
         .unwrap()
         .with_symbol("N")
 });
 
 // Power
-pub static WATT: Lazy<Unit> = Lazy::new(|| (&*JOULE / &SECOND).unwrap().with_symbol("W"));
+pub static WATT: Lazy<Unit> = Lazy::new(|| (&*JOULE / SECOND).unwrap().with_symbol("W"));
+
+// SI prefixes
+pub static PETASECOND: Base = Base::new("Ps", Time, 1e15);
+pub static TERASECOND: Base = Base::new("Ts", Time, 1e12);
+pub static GIGASECOND: Base = Base::new("Gs", Time, 1e9);
+pub static MEGASECOND: Base = Base::new("Ms", Time, 1e6);
+pub static KILOSECOND: Base = Base::new("ks", Time, 1e3);
+pub static MILLISECOND: Base = Base::new("ms", Time, 1e-3);
+pub static MICROSECOND: Base = Base::new("us", Time, 1e-6);
+pub static NANOSECOND: Base = Base::new("ns", Time, 1e-9);
+pub static PICOSECOND: Base = Base::new("ps", Time, 1e-12);
+pub static FEMTOSECOND: Base = Base::new("fs", Time, 1e-15);
+
+pub static PETAMETER: Base = Base::new("Pm", Length, 1e15);
+pub static TERAMETER: Base = Base::new("Tm", Length, 1e12);
+pub static GIGAMETER: Base = Base::new("Gm", Length, 1e9);
+pub static MEGAMETER: Base = Base::new("Mm", Length, 1e6);
+pub static KILOMETER: Base = Base::new("km", Length, 1e3);
+pub static CENTIMETER: Base = Base::new("cm", Length, 1e-2);
+pub static MILLIMETER: Base = Base::new("mm", Length, 1e-3);
+pub static MICROMETER: Base = Base::new("um", Length, 1e-6);
+pub static NANOMETER: Base = Base::new("nm", Length, 1e-9);
+pub static PICOMETER: Base = Base::new("pm", Length, 1e-12);
+pub static FEMTOMETER: Base = Base::new("fm", Length, 1e-15);
+
+pub static PETAGRAM: Base = Base::new("Pg", Mass, 1e15);
+pub static TERAGRAM: Base = Base::new("Tg", Mass, 1e12);
+pub static GIGAGRAM: Base = Base::new("Gg", Mass, 1e9);
+pub static MEGAGRAM: Base = Base::new("Mg", Mass, 1e6);
+pub static MILLIGRAM: Base = Base::new("mg", Mass, 1e-3);
+pub static MICROGRAM: Base = Base::new("ug", Mass, 1e-6);
+pub static NANOGRAM: Base = Base::new("ng", Mass, 1e-9);
+pub static PICOGRAM: Base = Base::new("pg", Mass, 1e-12);
+pub static FEMTOGRAM: Base = Base::new("fg", Mass, 1e-15);
+
+pub static PETAAMPERE: Base = Base::new("PA", Current, 1e15);
+pub static TERAAMPERE: Base = Base::new("TA", Current, 1e12);
+pub static GIGAAMPERE: Base = Base::new("GA", Current, 1e9);
+pub static MEGAAMPERE: Base = Base::new("MA", Current, 1e6);
+pub static KILOAMPERE: Base = Base::new("kA", Current, 1e3);
+pub static MILLIAMPERE: Base = Base::new("mA", Current, 1e-3);
+pub static MICROAMPERE: Base = Base::new("uA", Current, 1e-6);
+pub static NANOAMPERE: Base = Base::new("nA", Current, 1e-9);
+pub static PICOAMPERE: Base = Base::new("pA", Current, 1e-12);
+pub static FEMTOAMPERE: Base = Base::new("fA", Current, 1e-15);
+
+pub static PETAKELVIN: Base = Base::new("PK", Temperature, 1e15);
+pub static TERAKELVIN: Base = Base::new("TK", Temperature, 1e12);
+pub static GIGAKELVIN: Base = Base::new("GK", Temperature, 1e9);
+pub static MEGAKELVIN: Base = Base::new("MK", Temperature, 1e6);
+pub static KILOKELVIN: Base = Base::new("kK", Temperature, 1e3);
+pub static MILLIKELVIN: Base = Base::new("mK", Temperature, 1e-3);
+pub static MICROKELVIN: Base = Base::new("uK", Temperature, 1e-6);
+pub static NANOKELVIN: Base = Base::new("nK", Temperature, 1e-9);
+pub static PICOKELVIN: Base = Base::new("pK", Temperature, 1e-12);
+pub static FEMTOKELVIN: Base = Base::new("fK", Temperature, 1e-15);
+
+pub static PETAMOLE: Base = Base::new("Pmol", AmountOfSubstance, 1e15);
+pub static TERAMOLE: Base = Base::new("Tmol", AmountOfSubstance, 1e12);
+pub static GIGAMOLE: Base = Base::new("Gmol", AmountOfSubstance, 1e9);
+pub static MEGAMOLE: Base = Base::new("Mmol", AmountOfSubstance, 1e6);
+pub static KILOMOLE: Base = Base::new("kmol", AmountOfSubstance, 1e3);
+pub static MILLIMOLE: Base = Base::new("mmol", AmountOfSubstance, 1e-3);
+pub static MICROMOLE: Base = Base::new("umol", AmountOfSubstance, 1e-6);
+pub static NANOMOLE: Base = Base::new("nmol", AmountOfSubstance, 1e-9);
+pub static PICOMOLE: Base = Base::new("pmol", AmountOfSubstance, 1e-12);
+pub static FEMTOMOLE: Base = Base::new("fmol", AmountOfSubstance, 1e-15);
+
+pub static PETACANDELA: Base = Base::new("Pcd", LuminousIntensity, 1e15);
+pub static TERACANDELA: Base = Base::new("Tcd", LuminousIntensity, 1e12);
+pub static GIGACANDELA: Base = Base::new("Gcd", LuminousIntensity, 1e9);
+pub static MEGACANDELA: Base = Base::new("Mcd", LuminousIntensity, 1e6);
+pub static KILOCANDELA: Base = Base::new("kcd", LuminousIntensity, 1e3);
+pub static MILLICANDELA: Base = Base::new("mcd", LuminousIntensity, 1e-3);
+pub static MICROCANDELA: Base = Base::new("ucd", LuminousIntensity, 1e-6);
+pub static NANOCANDELA: Base = Base::new("ncd", LuminousIntensity, 1e-9);
+pub static PICOCANDELA: Base = Base::new("pcd", LuminousIntensity, 1e-12);
+pub static FEMTOCANDELA: Base = Base::new("fcd", LuminousIntensity, 1e-15);
+
+pub static PETARADIAN: Base = Base::new("Prad", Angle, 1e15);
+pub static TERARADIAN: Base = Base::new("Trad", Angle, 1e12);
+pub static GIGARADIAN: Base = Base::new("Grad", Angle, 1e9);
+pub static MEGARADIAN: Base = Base::new("Mrad", Angle, 1e6);
+pub static KILORADIAN: Base = Base::new("krad", Angle, 1e3);
+pub static MILLIRADIAN: Base = Base::new("mrad", Angle, 1e-3);
+pub static MICRORADIAN: Base = Base::new("urad", Angle, 1e-6);
+pub static NANORADIAN: Base = Base::new("nrad", Angle, 1e-9);
+pub static PICORADIAN: Base = Base::new("prad", Angle, 1e-12);
+pub static FEMTORADIAN: Base = Base::new("frad", Angle, 1e-15);

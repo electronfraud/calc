@@ -37,7 +37,7 @@ pub const NUM_PHYSICAL_QUANTITIES: usize = 8;
 ///
 /// `Base` is not used by itself to perform unit conversions. Instead, it is
 /// used to build `Unit`s, which do perform conversions.
-#[derive(Clone, Debug)]
+#[derive(Clone, Copy, Debug)]
 pub struct Base {
     /// Symbolic representation of the unit, e.g. "m" for meters.
     pub symbol: &'static str,
@@ -50,10 +50,6 @@ pub struct Base {
     /// that equals zero in the corresponding SI base unit. For example, for
     /// temperature Celsius this field is -273.15. For degrees Celsius, this
     /// field is `None`.
-    // TODO: the meaning of this field should be changed to:
-    // - Some(0.0): default
-    // - Some(n|n != 0.0): non-ratiometric
-    // - None: interval
     pub zero: Option<f64>,
 }
 
@@ -66,7 +62,7 @@ impl Base {
             symbol,
             physq,
             factor,
-            zero: None,
+            zero: Some(0.0),
         }
     }
 
@@ -82,10 +78,22 @@ impl Base {
         }
     }
 
+    /// Returns a new `Base` unit identical to this unit except that it has no
+    /// zero.
+    #[must_use]
+    pub const fn without_zero(&self) -> Self {
+        Self {
+            symbol: self.symbol,
+            physq: self.physq,
+            factor: self.factor,
+            zero: None,
+        }
+    }
+
     /// Returns a `Unit` that consists of this base unit with an exponent of +1.
     #[allow(clippy::missing_panics_doc)]
     #[must_use]
-    pub fn as_unit(&'static self) -> Unit {
+    pub fn as_unit(self) -> Unit {
         Unit::new(&[self], &[]).unwrap()
     }
 }
@@ -104,7 +112,7 @@ impl PartialEq<Base> for Base {
     }
 }
 
-impl std::ops::Mul<&'static Base> for &'static Base {
+impl std::ops::Mul<Base> for Base {
     type Output = Result<Unit, Error>;
 
     /// Produces a derived unit `self`⋅`other`.
@@ -113,7 +121,7 @@ impl std::ops::Mul<&'static Base> for &'static Base {
     }
 }
 
-impl std::ops::Mul<Unit> for &'static Base {
+impl std::ops::Mul<Unit> for Base {
     type Output = Result<Unit, Error>;
 
     /// Produces a derived unit `self`⋅`other`.
@@ -124,7 +132,7 @@ impl std::ops::Mul<Unit> for &'static Base {
     }
 }
 
-impl std::ops::Div<&'static Base> for &'static Base {
+impl std::ops::Div<Base> for Base {
     type Output = Result<Unit, Error>;
 
     /// Produces a derived unit `self`⋅`other`⁻¹.
@@ -133,7 +141,7 @@ impl std::ops::Div<&'static Base> for &'static Base {
     }
 }
 
-impl std::ops::Div<Unit> for &'static Base {
+impl std::ops::Div<Unit> for Base {
     type Output = Result<Unit, Error>;
 
     /// Produces a derived unit `self`⋅`other`⁻¹.
@@ -150,32 +158,32 @@ mod tests {
 
     #[test]
     fn base_multiplied_by_base() {
-        let m_kg = (&METER * &KILOGRAM).unwrap();
-        assert_eq!(*m_kg.numer(), vec![&METER, &KILOGRAM]);
+        let m_kg = (METER * KILOGRAM).unwrap();
+        assert_eq!(*m_kg.numer(), vec![METER, KILOGRAM]);
         assert_eq!(m_kg.denom().len(), 0);
     }
 
     #[test]
     fn base_multiplied_by_unit() {
-        let m_per_s = (&METER / &SECOND).unwrap();
-        let kg_m_per_s = (&KILOGRAM * m_per_s).unwrap();
-        assert_eq!(*kg_m_per_s.numer(), vec![&KILOGRAM, &METER]);
-        assert_eq!(*kg_m_per_s.denom(), vec![&SECOND]);
+        let m_per_s = (METER / SECOND).unwrap();
+        let kg_m_per_s = (KILOGRAM * m_per_s).unwrap();
+        assert_eq!(*kg_m_per_s.numer(), vec![KILOGRAM, METER]);
+        assert_eq!(*kg_m_per_s.denom(), vec![SECOND]);
     }
 
     #[test]
     fn base_divided_by_base() {
-        let m_per_s = (&METER / &SECOND).unwrap();
-        assert_eq!(*m_per_s.numer(), vec![&METER]);
-        assert_eq!(*m_per_s.denom(), vec![&SECOND]);
+        let m_per_s = (METER / SECOND).unwrap();
+        assert_eq!(*m_per_s.numer(), vec![METER]);
+        assert_eq!(*m_per_s.denom(), vec![SECOND]);
     }
 
     #[test]
     fn base_divided_by_unit() {
-        let m_per_s = (&METER / &SECOND).unwrap();
-        let kg_s_per_m = (&KILOGRAM / m_per_s).unwrap();
-        assert_eq!(*kg_s_per_m.numer(), vec![&KILOGRAM, &SECOND]);
-        assert_eq!(*kg_s_per_m.denom(), vec![&METER]);
+        let m_per_s = (METER / SECOND).unwrap();
+        let kg_s_per_m = (KILOGRAM / m_per_s).unwrap();
+        assert_eq!(*kg_s_per_m.numer(), vec![KILOGRAM, SECOND]);
+        assert_eq!(*kg_s_per_m.denom(), vec![METER]);
     }
 
     #[test]
