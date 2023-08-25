@@ -61,6 +61,7 @@ pub static CANDELA: Base = Base::new("cd", LuminousIntensity, 1.0);
 pub static RADIAN: Base = Base::new("rad", Angle, 1.0);
 
 // More times
+pub static DAY: Base = Base::new("day", Time, 86400.0);
 pub static HOUR: Base = Base::new("hr", Time, 3600.0);
 pub static MINUTE: Base = Base::new("min", Time, 60.0);
 
@@ -72,6 +73,7 @@ pub static INCH: Base = Base::new("in", Length, 0.3048 / 12.0);
 pub static FOOT: Base = Base::new("ft", Length, 0.3048);
 pub static MILE: Base = Base::new("mi", Length, 1609.344);
 pub static NAUTICAL_MILE: Base = Base::new("NM", Length, 1852.0);
+pub static MIL: Base = Base::new("mil", Length, 0.000_304_8 / 12.0);
 
 // More temperatures
 pub static DEG_CELSIUS: Base = Base::new("degC", Temperature, 1.0);

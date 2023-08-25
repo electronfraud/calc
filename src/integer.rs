@@ -10,7 +10,7 @@ pub enum Representation {
     Hexadecimal,
 }
 
-/// An integer represented in hexadecimal, octal, or binary.
+/// An integer represented in hexadecimal, decimal, octal, or binary.
 #[derive(Clone, Debug, PartialEq)]
 pub struct Integer {
     pub value: i64,
@@ -33,11 +33,11 @@ impl Integer {
     /// Basic usage:
     ///
     /// ```
-    /// use calc::integer::{Integer, Representation::*};
-    /// assert_eq!(Integer::parse("0xcafe"), Some(Integer { value: 0xcafe, repr: Hexadecimal }));
-    /// assert_eq!(Integer::parse("123,456,789"), Some(Integer { value: 123456789, repr: Decimal }));
-    /// assert_eq!(Integer::parse("0774"), Some(Integer { value: 0o774, repr: Octal }));
-    /// assert_eq!(Integer::parse("0b110100_11101101"), Some(Integer { value: 0b11010011101101, repr: Binary }));
+    /// use calc::integer::Integer;
+    /// assert_eq!(Integer::parse("0xcafe"), Some(Integer::hex(0xcafe)));
+    /// assert_eq!(Integer::parse("123,456,789"), Some(Integer::dec(123456789)));
+    /// assert_eq!(Integer::parse("0774"), Some(Integer::oct(0o774)));
+    /// assert_eq!(Integer::parse("0b110100_11101101"), Some(Integer::bin(0b11010011101101)));
     /// ```
     #[must_use]
     pub fn parse(s: &str) -> Option<Integer> {

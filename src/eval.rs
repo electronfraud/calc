@@ -66,11 +66,13 @@ impl Context {
         self.stack.pushx(x);
     }
 
-    /// Evaluates a word token by looking for a builtin with the name contained in
-    /// the token and executing it. If the builtin returns an error, or if no
-    /// builtin is found, prints an error and returns false.
+    /// Evaluates a word token by looking for a builtin with the name contained
+    /// in the token and executing it.
     ///
-    /// Returns `true` if evaluation succeeded.
+    /// # Errors
+    /// Returns an error if:
+    /// - no builtin named `w` exists; or,
+    /// - the builtin returns an error.
     fn eval_word(&mut self, w: &str) -> Result<(), Error> {
         if let Some(f) = self.builtins.get(w) {
             if let Err(e) = f(&mut self.stack) {
@@ -105,7 +107,7 @@ impl Context {
         prompt
     }
 
-    /// Returns an iterator over the names of the builtins.
+    /// Returns the names of all the builtins, in no particular order.
     pub fn builtin_names(&self) -> Vec<String> {
         self.builtins.keys().map(ToString::to_string).collect()
     }
@@ -131,13 +133,10 @@ impl Token {
         for word in s.split_ascii_whitespace() {
             if let Some(x) = integer::Integer::parse(word) {
                 tokens.push(Token::Integer(x));
+            } else if let Ok(x) = word.replace(',', "").parse::<f64>() {
+                tokens.push(Token::Float(x));
             } else {
-                let no_commas = word.replace(',', "");
-                if let Ok(x) = no_commas.parse::<f64>() {
-                    tokens.push(Token::Float(x));
-                } else {
-                    tokens.push(Token::Word(String::from(word)));
-                }
+                tokens.push(Token::Word(String::from(word)));
             }
         }
         tokens

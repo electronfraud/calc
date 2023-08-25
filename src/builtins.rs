@@ -19,7 +19,7 @@
 
 use std::collections::HashMap;
 
-use crate::{commit, pop_as_f, pop_as_ff, pop_as_fu, pop_as_i, pop_as_ii, popf, popn, popnn};
+use crate::{commit, pop_as_f, pop_as_ff, pop_as_fu, pop_as_i, pop_as_ii, popn, popnn};
 use crate::{
     integer, stack,
     stack::Stack,
@@ -89,7 +89,7 @@ pub fn builtin_add(stack: &mut Stack) -> Result {
     commit!(tx)
 }
 
-/// `( a b -- a-b )` Pops two items, subtracts the topmost item from the other
+/// `( a b -- a-b )` Pops two items, subtracts the upper item from the lower
 /// item, and pushes the result.
 ///
 /// # Errors
@@ -129,6 +129,7 @@ pub fn builtin_sub(stack: &mut Stack) -> Result {
 /// - the items are not two numbers;
 /// - the items are not two units; or,
 /// - the items are not a number `a` and a unit `b`.
+/// - the operation would result in a nonsensical temperature unit.
 pub fn builtin_mul(stack: &mut Stack) -> Result {
     let mut tx = stack.begin();
     let items = tx.pop2()?;
@@ -162,7 +163,7 @@ pub fn builtin_mul(stack: &mut Stack) -> Result {
 /// - the items are not two numbers;
 /// - the items are not two units;
 /// - the items are not a number `a` and a unit `b`;
-/// - the division would result in a nonsensical temperature unit.
+/// - the operation would result in a nonsensical temperature unit.
 pub fn builtin_div(stack: &mut Stack) -> Result {
     let mut tx = stack.begin();
     let items = tx.pop2()?;
@@ -353,9 +354,14 @@ pub fn builtin_dup(stack: &mut Stack) -> Result {
 /// - the item on top of the stack is not a number.
 pub fn builtin_drop(stack: &mut Stack) -> Result {
     let mut tx = stack.begin();
-    let n = popf!(tx)?;
-    tx.pushx(n.value);
-    commit!(tx)
+    match tx.pop()? {
+        stack::Item::Float(x) => {
+            tx.pushx(x.value);
+            commit!(tx)
+        }
+        stack::Item::Integer(_) => Ok(()),
+        stack::Item::Unit(_) => Err(Error::Stack(stack::Error::TypeMismatch)),
+    }
 }
 
 /// `( [n u1] u2 -- [n u2] )` Converts a number into different units.
@@ -447,14 +453,8 @@ binrepr!(builtin_hex, integer::Representation::Hexadecimal);
 ///   number.
 pub fn builtin_keep(stack: &mut Stack) -> Result {
     let mut tx = stack.begin();
-    let n = popf!(tx)?;
-    if !n.is_dimensionless() {
-        return Err(Error::NotDimensionless);
-    }
-    if n.value.fract() != 0.0 {
-        return Err(Error::NotWhole);
-    }
-    if n.value < 0.0 {
+    let n = pop_as_i!(tx)?;
+    if n.value < 0 {
         return Err(Error::NotNonNegative);
     }
     #[allow(clippy::cast_possible_truncation, clippy::cast_sign_loss)]
@@ -627,6 +627,8 @@ pub fn table() -> Table {
         base!(units::MILLIMETER),
         base!(units::CENTIMETER),
         base!(units::MINUTE),
+        base!(units::DAY),
+        base!(units::MIL),
         unit!(&*units::NEWTON),
         unit!(&*units::JOULE),
         unit!(&*units::WATT),

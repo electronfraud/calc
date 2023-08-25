@@ -17,8 +17,6 @@
 
 //! The stack.
 //!
-//!
-//!
 //! # Examples
 //!
 //! Stacks can be used in transactions so that if an operation on a popped
@@ -83,7 +81,6 @@ pub enum Item {
 }
 
 /// A LIFO collection of typed objects.
-///
 pub struct Stack(Vec<Item>);
 
 impl Stack {
@@ -176,8 +173,8 @@ impl Transaction<'_> {
 
     /// Pops an item off the stack.
     ///
-    /// Use the `popb`, `popn`, and `popu` macros to pop an item and perform
-    /// type-checking.
+    /// Use the various pop macros to pop an item and perform type-checking
+    /// and/or casting.
     ///
     /// # Errors
     ///
@@ -195,8 +192,8 @@ impl Transaction<'_> {
 
     /// Pops two items off the stack and returns them.
     ///
-    /// Use the `popbb`, `popnn`, and `popnu` macros to pop items and perform
-    /// type-checking.
+    /// Use the various pop macros to pop an item and perform type-checking
+    /// and/or casting.
     ///
     /// # Errors
     ///
@@ -313,8 +310,7 @@ macro_rules! pop_as_f {
 }
 
 /// Pops two numeric items off the stack. When successful, the results will
-/// alwayus be fractional components, even if any of the popped items was an
-/// integer.
+/// always be `units::Number`s, even if any of the popped items was an integer.
 #[macro_export]
 macro_rules! pop_as_ff {
     ($stacklike: ident) => {
