@@ -221,6 +221,14 @@ There are a few built-in constants. To push one, enter its name.
 
 This is a list of all available commands.
 
+The effect of a command on the stack is described here using stack notation.
+The notation `( n1 u -- n2 )` means that a command pops a number (`n1`) and a
+unit (`u`) off the stack and pushes one number (`n2`). The symbols used for
+each item is sometimes arbitrary but generally an item's symbol indicates its
+type. More complex effects may use notations like `( ... a -- a ... )`
+(pops `a`, an item of any type, and moves it to the bottom of the stack) or
+`( a1 ... aN N -- )` (pops `N`, then pops `N` items).
+
 #### Interface
 
 | Name    | Description       |
@@ -230,58 +238,61 @@ This is a list of all available commands.
 
 #### Arithmetic
 
-| Name    | Description                        |
-|---------|------------------------------------|
-| `+`     | Addition.                          |
-| `-`     | Subtraction.                       |
-| `*`     | Multiplication.                    |
-| `/`     | Division.                          |
-| `**`    | Raises a number to a power.        |
-| `exp`   | Raises e to a power.               |
-| `sqrt`  | Square root.                       |
-| `cbrt`  | Cube root.                         |
-| `/**`   | Root of specified degree.          |
+| Name   | Effect                  | Description                                               |
+|--------|-------------------------|-----------------------------------------------------------|
+| `+`    | `( n1 n2 -- n1+n2 )`    | Addition.                                                 |
+| `-`    | `( n1 n2 -- n1-n2 )`    | Subtraction.                                              |
+| `*`    | `( a b -- a*b )`        | Multiplication. You can multiply numbers, units, or both. |
+| `/`    | `( a b -- a/b )`        | Division. You can divide numbers, units, or both.         |
+| `**`   | `( n1 n2 -- n1**n2 )`   | Raises a number to a power.                               |
+| `exp`  | `( n -- e**n )`         | Raises e to a power.                                      |
+| `sqrt` | `( n -- n**1/2 )`       | Square root.                                              |
+| `cbrt` | `( n -- n**1/3 )`       | Cube root.                                                |
+| `/**`  | `( n1 n2 -- n1**1/n2 )` | Root of specified degree.                                 |
 
 #### Trigonometry
 
-| Name    | Description                                       |
-|---------|---------------------------------------------------|
-| `sin`   | Sine. Accepts any angle unit.                     |
-| `cos`   | Cosine. Accepts any angle unit.                   |
-| `tan`   | Tangent. Accepts any angle unit.                  |
-| `asin`  | Arc sine. Result has units of `rad` (radians).    |
-| `acos`  | Arc cosine. Result has units of `rad` (radians).  |
-| `atan`  | Arc tangent. Result has units of `rad` (radians). |
+| Name   | Effect         | Description                                       |
+|--------|----------------|---------------------------------------------------|
+| `sin`  | `( n1 -- n2 )` | Sine. Accepts any angle unit.                     |
+| `cos`  | `( n1 -- n2 )` | Cosine. Accepts any angle unit.                   |
+| `tan`  | `( n1 -- n2 )` | Tangent. Accepts any angle unit.                  |
+| `asin` | `( n1 -- n2 )` | Arc sine. Result has units of `rad` (radians).    |
+| `acos` | `( n1 -- n2 )` | Arc cosine. Result has units of `rad` (radians).  |
+| `atan` | `( n1 -- n2 )` | Arc tangent. Result has units of `rad` (radians). |
 
 #### Unit Conversion
 
-| Name    | Description                            |
-|---------|----------------------------------------|
-| `drop`  | Remove the units from a number.        |
-| `into`  | Convert a number into different units. |
+| Name   | Effect                      | Description                            |
+|--------|-----------------------------|----------------------------------------|
+| `drop` | `( [n u] -- n )`            | Remove the units from a number.        |
+| `into` | `( [n1 u1] u2 -- [n2 u2] )` | Convert a number into different units. |
 
 #### Bitwise and Binary Integer Operations
 
-| Name  | Description                        |
-|-------|------------------------------------|
-| `&`   | Bitwise AND.                       |
-| `\|`   | Bitwise OR.                       |
-| `^`   | Bitwise XOR.                       |
-| `~`   | Bitwise complement.                |
-| `hex` | Display an integer in hexadecimal. |
-| `dec` | Display an integer in decimal.     |
-| `oct` | Display an integer in octal.       |
-| `bin` | Display an integer in binary.      |
+| Name   | Effect               | Description                         |
+|--------|----------------------|-------------------------------------|
+| `&`    | `( i1 i2 -- i1&i2 )` | Bitwise AND.                        |
+| `\|`    | `( i1 i2 -- i1\|i2 )` | Bitwise OR.                         |
+| `^`    | `( i1 i2 -- i1^i2 )` | Bitwise XOR.                        |
+| `~`    | `( i -- ~i )`        | Bitwise complement.                 |
+| `hex`  | `( i -- 0xi )`       | Display an integer in hexadecimal.  |
+| `dec`  | `( i -- i )`         | Display an integer in decimal.      |
+| `oct`  | `( i -- 0i )`        | Display an integer in octal.        |
+| `bin`  | `( i -- 0bi )`       | Display an integer in binary.       |
+| `bset` | `( i1 i2 -- i3 )`    | Set a bit in an integer by index.   |
+| `bclr` | `( i1 i2 -- i3 )`    | Clear a bit in an integer by index. |
+| `bget` | `( i1 i2 -- i1 i3 )` | Get a bit in an integer by index.   |
 
 #### Stack Manipulation
 
-| Name    | Description                                 |
-|---------|---------------------------------------------|
-| `clear` | Empty the stack.                            |
-| `dup`   | Duplicate the item on top of the stack.     |
-| `keep`  | Empty the stack except for the top N items. |
-| `pop`   | Pop an item off the stack.                  |
-| `swap`  | Swap the top two items on the stack.        |
+| Name    | Effect                               | Description                                 |
+|---------|--------------------------------------|---------------------------------------------|
+| `clear` | `( ... -- )`                         | Empty the stack.                            |
+| `dup`   | `( a -- a a )`                       | Duplicate the item on top of the stack.     |
+| `keep`  | `( ... a1 ... aN N -- a1 ... aN N )` | Empty the stack except for the top N items. |
+| `pop`   | `( a -- )`                           | Pop an item off the stack.                  |
+| `swap`  | `( a b -- b a )`                     | Swap the top two items on the stack.        |
 
 ### Units
 
