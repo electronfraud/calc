@@ -6,7 +6,7 @@ use crate::{builtins, integer, stack, stack::Stack};
 
 /// An evaluation context.
 pub struct Context {
-    stack: Stack,
+    pub stack: Stack,
     builtins: builtins::Table,
 }
 

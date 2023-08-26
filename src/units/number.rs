@@ -57,6 +57,59 @@ impl Number {
         self.value.fract() == 0.0
     }
 
+    /// Performs more advanced simplification than `Unit` is capable of doing
+    /// on its own. Returns a `Number` that is mathematically equal to this one
+    /// but with the units simplified by physical quantity. For example, `Unit`
+    /// can simplify `m*s/m` into `s`, but can't simplify `m*s/ft` because
+    /// doing so requires a conversion and multiplication of a number the
+    /// `Unit` doesn't have access to. `Number` is able to simplify `m*s/ft`
+    /// into `s` because it can apply the conversion factor to its value.
+    fn simplified(&self) -> Result<Number, Error> {
+        if let Some(u) = self.unit.as_ref() {
+            let mut value = self.value;
+            let mut s_numer = u.numer().clone();
+            let mut s_denom = u.denom().clone();
+            let mut should_incr: bool;
+
+            // Cancel out like physical quantities from numerator/denominator
+            let mut numer_ix = 0;
+
+            while numer_ix < s_numer.len() {
+                should_incr = true;
+
+                for denom_ix in 0..s_denom.len() {
+                    if s_numer[numer_ix].physq == s_denom[denom_ix].physq {
+                        value *= s_numer[numer_ix].factor;
+                        value /= s_denom[denom_ix].factor;
+                        s_numer.remove(numer_ix);
+                        s_denom.remove(denom_ix);
+                        should_incr = false;
+                        break;
+                    }
+                }
+
+                if should_incr {
+                    numer_ix += 1;
+                }
+            }
+
+            // Make like physical quantities the same base
+            value = combine_bases(&mut s_numer, value, false);
+            value = combine_bases(&mut s_denom, value, true);
+
+            if s_numer.is_empty() && s_denom.is_empty() {
+                Ok(Number::new(value))
+            } else {
+                Unit::new(&s_numer, &s_denom).map(|u| Number {
+                    value,
+                    unit: Some(u),
+                })
+            }
+        } else {
+            Ok(self.clone())
+        }
+    }
+
     /// Raises this number to the power of another number.
     ///
     /// # Errors
@@ -147,7 +200,31 @@ impl Number {
     }
 }
 
-/// Helper for `roots`. Counts the number of times each unique base appears in
+/// Helper for `simplified`.
+fn combine_bases(bases: &mut Vec<Base>, value: f64, inverse: bool) -> f64 {
+    let mut value = value;
+    let mut i = 0;
+    while i < bases.len() {
+        let mut j = i + 1;
+        while j < bases.len() {
+            if bases[i].physq == bases[j].physq {
+                if inverse {
+                    value *= bases[i].factor;
+                    value /= bases[j].factor;
+                } else {
+                    value /= bases[i].factor;
+                    value *= bases[j].factor;
+                }
+                bases[j] = bases[i];
+            }
+            j += 1;
+        }
+        i += 1;
+    }
+    value
+}
+
+/// Helper for `root`. Counts the number of times each unique base appears in
 /// `bases`. Returns parallel vectors containing de-duplicated `bases` and the
 /// number of times each base appears in `bases`.
 fn base_counts(bases: &[Base]) -> (Vec<Base>, Vec<usize>) {
@@ -166,7 +243,7 @@ fn base_counts(bases: &[Base]) -> (Vec<Base>, Vec<usize>) {
     (uniq_bases, counts)
 }
 
-/// Helper for `roots`. Takes parallel vectors `bases` and `counts` and returns
+/// Helper for `root`. Takes parallel vectors `bases` and `counts` and returns
 /// a vector with each base `bases[n]` appearing `counts[n]` / `divisor` times.
 fn divide_base_counts(bases: &[Base], counts: &[usize], divisor: usize) -> Vec<Base> {
     let mut result: Vec<Base> = Vec::new();
@@ -288,10 +365,15 @@ impl std::ops::Mul<&Number> for &Number {
         let v2 = other.value;
 
         match (&self.unit, &other.unit) {
-            (Some(u1), Some(u2)) => (u1 * u2).map(|u| Number::new(v1 * v2).with_unit(u)),
-            (Some(u), None) | (None, Some(u)) => Ok(Number::new(v1 * v2).with_unit(u.clone())),
+            (Some(u1), Some(u2)) => {
+                (u1 * u2).map(|u| Number::new(v1 * v2 * u1.factor() * u2.factor()).with_unit(u))
+            }
+            (Some(u), None) | (None, Some(u)) => {
+                Ok(Number::new(v1 * v2 * u.factor()).with_unit(u.clone()))
+            }
             (None, None) => Ok(Number::new(v1 * v2)),
         }
+        .and_then(|n| n.simplified())
     }
 }
 
@@ -317,11 +399,16 @@ impl std::ops::Div<&Number> for &Number {
         let v2 = other.value;
 
         match (&self.unit, &other.unit) {
-            (Some(u1), Some(u2)) => (u1 / u2).map(|u| Number::new(v1 / v2).with_unit(u)),
-            (Some(u1), None) => Ok(Number::new(v1 / v2).with_unit(u1.clone())),
-            (None, Some(u2)) => u2.inverse().map(|u| Number::new(v1 / v2).with_unit(u)),
+            (Some(u1), Some(u2)) => {
+                (u1 / u2).map(|u| Number::new(v1 / v2 * u1.factor() / u2.factor()).with_unit(u))
+            }
+            (Some(u1), None) => Ok(Number::new(v1 / v2 * u1.factor()).with_unit(u1.clone())),
+            (None, Some(u2)) => u2
+                .inverse()
+                .map(|u| Number::new(v1 / v2 / u2.factor()).with_unit(u)),
             (None, None) => Ok(Number::new(v1 / v2)),
         }
+        .and_then(|u| u.simplified())
     }
 }
 
@@ -445,9 +532,9 @@ mod tests {
         let x = (&Number::new(5.0).with_unit((METER / SECOND).unwrap())
             * &Number::new(10.0).with_unit((MILE / HOUR).unwrap()))
             .unwrap();
-        assert_eq!(x.value, 50.0);
-        assert_eq!(*x.unit.as_ref().unwrap().numer(), vec![METER, MILE]);
-        assert_eq!(*x.unit.unwrap().denom(), vec![SECOND, HOUR]);
+        assert_eq!(x.value, 22.352);
+        assert_eq!(*x.unit.as_ref().unwrap().numer(), vec![METER, METER]);
+        assert_eq!(*x.unit.unwrap().denom(), vec![SECOND, SECOND]);
     }
 
     #[test]
@@ -505,9 +592,8 @@ mod tests {
         let x = (&Number::new(5.0).with_unit((METER / SECOND).unwrap())
             / &Number::new(10.0).with_unit((MILE / HOUR).unwrap()))
             .unwrap();
-        assert_eq!(x.value, 0.5);
-        assert_eq!(*x.unit.as_ref().unwrap().numer(), vec![METER, HOUR]);
-        assert_eq!(*x.unit.unwrap().denom(), vec![SECOND, MILE]);
+        assert_eq!(x.value, 1.118468146027201);
+        assert!(x.unit.is_none());
     }
 
     #[test]

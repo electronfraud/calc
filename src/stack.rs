@@ -107,10 +107,13 @@ impl Stack {
         self.0.clear();
     }
 
-    /// Pops an item off of the stack and returns it. Returns `None` if the
-    /// stack is empty.
-    pub fn pop(&mut self) -> Option<Item> {
-        self.0.pop()
+    /// Pops an item off of the stack and returns it.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the stack is empty.
+    pub fn pop(&mut self) -> Result<Item, Error> {
+        self.0.pop().ok_or(Error::Underflow)
     }
 
     /// Pushes a floating-point number with optional units onto the stack.
@@ -413,7 +416,7 @@ macro_rules! popnn {
 /// Pops a floating-point number off a stack.
 #[macro_export]
 macro_rules! popf {
-    ($tx: ident) => {
+    ($tx: expr) => {
         $tx.pop().and_then(|items| match items {
             $crate::stack::Item::Float(a) => Ok(a),
             _ => Err($crate::stack::Error::TypeMismatch),
@@ -424,7 +427,7 @@ macro_rules! popf {
 /// Pops two floating-point numbers off a stack.
 #[macro_export]
 macro_rules! popff {
-    ($tx: ident) => {
+    ($tx: expr) => {
         $tx.pop2().and_then(|items| match items {
             ($crate::stack::Item::Float(a), $crate::stack::Item::Float(b)) => Ok((a, b)),
             _ => Err($crate::stack::Error::TypeMismatch),
@@ -435,7 +438,7 @@ macro_rules! popff {
 /// Pops a floating-point number and a unit off a stack.
 #[macro_export]
 macro_rules! popfu {
-    ($tx: ident) => {
+    ($tx: expr) => {
         $tx.pop2().and_then(|items| match items {
             ($crate::stack::Item::Float(a), $crate::stack::Item::Unit(b)) => Ok((a, b)),
             _ => Err($crate::stack::Error::TypeMismatch),
@@ -446,7 +449,7 @@ macro_rules! popfu {
 /// Commits a transaction. Evaluates to `Ok(())`.
 #[macro_export]
 macro_rules! commit {
-    ($tx: ident) => {{
+    ($tx: expr) => {{
         $tx.commit();
         Ok(())
     }};
@@ -502,9 +505,9 @@ mod tests {
         assert_eq!(s.height(), 1);
         s.pushx(6.2);
         assert_eq!(s.height(), 2);
-        s.pop();
+        let _ = s.pop();
         assert_eq!(s.height(), 1);
-        s.pop();
+        let _ = s.pop();
         assert_eq!(s.height(), 0);
     }
 
@@ -516,9 +519,9 @@ mod tests {
         assert!(!s.is_empty());
         s.pushx(6.2);
         assert!(!s.is_empty());
-        s.pop();
+        let _ = s.pop();
         assert!(!s.is_empty());
-        s.pop();
+        let _ = s.pop();
         assert!(s.is_empty());
     }
 

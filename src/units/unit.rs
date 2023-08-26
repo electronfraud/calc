@@ -114,6 +114,11 @@ impl Unit {
         &self.denom
     }
 
+    #[must_use]
+    pub fn factor(&self) -> f64 {
+        self.factor
+    }
+
     /// Converts a number in this unit to another unit.
     ///
     /// # Errors
