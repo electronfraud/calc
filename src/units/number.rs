@@ -366,10 +366,10 @@ impl std::ops::Mul<&Number> for &Number {
 
         match (&self.unit, &other.unit) {
             (Some(u1), Some(u2)) => {
-                (u1 * u2).map(|u| Number::new(v1 * v2 * u1.factor() * u2.factor()).with_unit(u))
+                (u1 * u2).map(|u| Number::new(v1 * v2 * u1.constant() * u2.constant()).with_unit(u))
             }
             (Some(u), None) | (None, Some(u)) => {
-                Ok(Number::new(v1 * v2 * u.factor()).with_unit(u.clone()))
+                Ok(Number::new(v1 * v2 * u.constant()).with_unit(u.clone()))
             }
             (None, None) => Ok(Number::new(v1 * v2)),
         }
@@ -400,12 +400,12 @@ impl std::ops::Div<&Number> for &Number {
 
         match (&self.unit, &other.unit) {
             (Some(u1), Some(u2)) => {
-                (u1 / u2).map(|u| Number::new(v1 / v2 * u1.factor() / u2.factor()).with_unit(u))
+                (u1 / u2).map(|u| Number::new(v1 / v2 * u1.constant() / u2.constant()).with_unit(u))
             }
-            (Some(u1), None) => Ok(Number::new(v1 / v2 * u1.factor()).with_unit(u1.clone())),
+            (Some(u1), None) => Ok(Number::new(v1 / v2 * u1.constant()).with_unit(u1.clone())),
             (None, Some(u2)) => u2
                 .inverse()
-                .map(|u| Number::new(v1 / v2 / u2.factor()).with_unit(u)),
+                .map(|u| Number::new(v1 / v2 / u2.constant()).with_unit(u)),
             (None, None) => Ok(Number::new(v1 / v2)),
         }
         .and_then(|u| u.simplified())

@@ -26,7 +26,7 @@ pub struct Unit {
     pub symbol: Option<String>,
     numer: Vec<Base>,
     denom: Vec<Base>,
-    factor: f64,
+    constant: f64,
 }
 
 impl Unit {
@@ -52,7 +52,7 @@ impl Unit {
             symbol: None,
             numer: Vec::from(numer),
             denom: Vec::from(denom),
-            factor: 1.0,
+            constant: 1.0,
         }
         .simplified();
 
@@ -82,19 +82,19 @@ impl Unit {
             symbol: Some(String::from(symbol)),
             numer: self.numer.clone(),
             denom: self.denom.clone(),
-            factor: self.factor,
+            constant: self.constant,
         }
     }
 
     /// Returns a new `Unit` identical to this one except that it has the given
-    /// factor.
+    /// constant.
     #[must_use]
-    pub fn with_factor(&self, factor: f64) -> Self {
+    pub fn with_constant(&self, constant: f64) -> Self {
         Unit {
             symbol: self.symbol.clone(),
             numer: self.numer.clone(),
             denom: self.denom.clone(),
-            factor,
+            constant,
         }
     }
 
@@ -115,8 +115,8 @@ impl Unit {
     }
 
     #[must_use]
-    pub fn factor(&self) -> f64 {
-        self.factor
+    pub fn constant(&self) -> f64 {
+        self.constant
     }
 
     /// Converts a number in this unit to another unit.
@@ -144,7 +144,7 @@ impl Unit {
         for base in &self.denom {
             num /= base.factor;
         }
-        num *= self.factor;
+        num *= self.constant;
 
         // Raise to new unit
         for base in &other.numer {
@@ -156,7 +156,7 @@ impl Unit {
         for base in &other.denom {
             num *= base.factor;
         }
-        num /= other.factor;
+        num /= other.constant;
 
         Ok(num)
     }
@@ -261,7 +261,7 @@ impl Unit {
             symbol: self.symbol.clone(),
             numer: s_numer,
             denom: s_denom,
-            factor: self.factor,
+            constant: self.constant,
         }
     }
 }
@@ -350,7 +350,7 @@ impl std::ops::Mul<Self> for &Unit {
         numer.extend(&other.numer);
         denom.extend(&other.denom);
         Unit::new(numer.as_slice(), denom.as_slice())
-            .map(|u| u.with_factor(self.factor * other.factor))
+            .map(|u| u.with_constant(self.constant * other.constant))
     }
 }
 
@@ -377,15 +377,15 @@ impl std::ops::Mul<Base> for &Unit {
                 let canceled = denom.remove(i);
 
                 #[allow(clippy::suspicious_arithmetic_impl)]
-                let factor = self.factor * other.factor / canceled.factor;
+                let constant = self.constant * other.factor / canceled.factor;
 
-                return Unit::new(&self.numer, &denom).map(|u| u.with_factor(factor));
+                return Unit::new(&self.numer, &denom).map(|u| u.with_constant(constant));
             }
         }
 
         let mut numer = self.numer.clone();
         numer.extend([other]);
-        Unit::new(numer.as_slice(), self.denom.as_slice()).map(|u| u.with_factor(self.factor))
+        Unit::new(numer.as_slice(), self.denom.as_slice()).map(|u| u.with_constant(self.constant))
     }
 }
 
@@ -400,7 +400,7 @@ impl std::ops::Div<Self> for &Unit {
         numer.extend(&other.denom);
         denom.extend(&other.numer);
         Unit::new(numer.as_slice(), denom.as_slice())
-            .map(|u| u.with_factor(self.factor / other.factor))
+            .map(|u| u.with_constant(self.constant / other.constant))
     }
 }
 
@@ -427,15 +427,15 @@ impl std::ops::Div<Base> for &Unit {
                 let canceled = numer.remove(i);
 
                 #[allow(clippy::suspicious_arithmetic_impl)]
-                let factor = self.factor / other.factor * canceled.factor;
+                let constant = self.constant / other.factor * canceled.factor;
 
-                return Unit::new(&numer, &self.denom).map(|u| u.with_factor(factor));
+                return Unit::new(&numer, &self.denom).map(|u| u.with_constant(constant));
             }
         }
 
         let mut denom = self.denom.clone();
         denom.extend([other]);
-        Unit::new(self.numer.as_slice(), denom.as_slice()).map(|u| u.with_factor(self.factor))
+        Unit::new(self.numer.as_slice(), denom.as_slice()).map(|u| u.with_constant(self.constant))
     }
 }
 
@@ -458,7 +458,7 @@ mod tests {
             symbol: Some(String::from("J")),
             numer: vec![KILOGRAM, METER, METER],
             denom: vec![SECOND, SECOND],
-            factor: 1.0,
+            constant: 1.0,
         };
         assert_eq!(joule.to_string(), "J");
 
@@ -466,7 +466,7 @@ mod tests {
             symbol: None,
             numer: vec![KILOGRAM, METER, METER],
             denom: vec![SECOND, SECOND],
-            factor: 1.0,
+            constant: 1.0,
         };
         assert_ne!(joule.to_string(), "J");
         assert_eq!(joule.with_symbol("J").to_string(), "J");
@@ -737,27 +737,27 @@ mod tests {
     }
 
     #[test]
-    fn factors() {
-        let millivolt = VOLT.with_factor(0.001).with_symbol("mV");
+    fn constants() {
+        let millivolt = VOLT.with_constant(0.001).with_symbol("mV");
         assert_eq!(VOLT.convert(1.0, &millivolt).unwrap(), 1000.0);
-        let kilovolt = VOLT.with_factor(1000.0).with_symbol("kV");
+        let kilovolt = VOLT.with_constant(1000.0).with_symbol("kV");
         assert_eq!(millivolt.convert(1.0, &kilovolt).unwrap(), 0.000001);
     }
 
     #[test]
-    fn factors_with_unit_division() {
+    fn constants_with_unit_division() {
         let u1 = (((POUND_MASS * METER).unwrap() / SECOND).unwrap() / SECOND)
             .unwrap()
-            .with_factor(9.80665);
+            .with_constant(9.80665);
 
         let u2 = (u1 / INCH).unwrap();
         assert_eq!(u2.numer(), &[POUND_MASS]);
         assert_eq!(u2.denom(), &[SECOND, SECOND]);
-        assert_eq!(u2.factor(), 386.0885826771653);
+        assert_eq!(u2.constant(), 386.0885826771653);
 
         let u3 = (u2 / INCH).unwrap();
         assert_eq!(u3.numer(), &[POUND_MASS]);
         assert_eq!(u3.denom(), &[SECOND, SECOND, INCH]);
-        assert_eq!(u3.factor(), 386.0885826771653);
+        assert_eq!(u3.constant(), 386.0885826771653);
     }
 }
