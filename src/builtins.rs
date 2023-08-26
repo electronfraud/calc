@@ -690,7 +690,7 @@ pub fn table() -> Table {
         base!(units::MIL),
         base!(units::YARD),
         // Mass
-        base!(units::POUND),
+        base!(units::POUND_MASS),
         base!(units::OUNCE),
         // Temperature
         base!(units::RANKINE),
@@ -701,9 +701,10 @@ pub fn table() -> Table {
         // Angle
         base!(units::DEGREE),
         // Energy
-        unit!(&*units::NEWTON),
-        // Force
         unit!(&*units::JOULE),
+        // Force
+        unit!(&*units::NEWTON),
+        unit!(&*units::POUND_FORCE),
         // Power
         unit!(&*units::WATT),
         // Pressure

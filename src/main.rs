@@ -18,7 +18,7 @@
 use rustyline as rl;
 use rustyline::error::ReadlineError;
 
-use calc::{builtins, eval, stack, units};
+use calc::{builtins, eval, stack, stack::Stack, units};
 
 /// Autocompletion helper.
 struct Completer {
@@ -103,6 +103,28 @@ fn print_error(error: &eval::Error, word: &String) {
     }
 }
 
+/// Returns a REPL prompt containing the elements in the stack, e.g. "(1 2) ".
+#[must_use]
+pub fn prompt(stack: &Stack) -> String {
+    let mut prompt = String::from("(");
+
+    for item in stack {
+        match item {
+            stack::Item::Float(n) => prompt.push_str(format!("{n}").as_str()),
+            stack::Item::Integer(b) => prompt.push_str(format!("{b}").as_str()),
+            stack::Item::Unit(u) => prompt.push_str(format!("{u}").as_str()),
+        };
+        prompt.push(' ');
+    }
+
+    if !stack.is_empty() {
+        prompt.pop();
+    }
+    prompt.push_str(") ");
+
+    prompt
+}
+
 fn main() -> Result<(), ReadlineError> {
     // Create the evaluation context.
     let mut ctx = eval::Context::new();
@@ -134,7 +156,7 @@ fn main() -> Result<(), ReadlineError> {
     // Run the REPL.
     loop {
         // Read
-        let input = match rl.readline(ctx.prompt().as_str()) {
+        let input = match rl.readline(prompt(&ctx.stack).as_str()) {
             Ok(s) => s,
             Err(ReadlineError::Eof) => return Ok(()), // normal end of input; exit Ok
             Err(e) => return Err(e),
@@ -146,7 +168,7 @@ fn main() -> Result<(), ReadlineError> {
         match ctx.eval(input.as_str()) {
             eval::Status::Ok => { /* do nothing */ }
             eval::Status::Err { error, word } => print_error(&error, &word),
-            eval::Status::Exit => return Ok(()),
+            eval::Status::Halt => return Ok(()),
         }
     }
 }

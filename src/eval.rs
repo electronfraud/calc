@@ -2,7 +2,7 @@
 
 use std::string::ToString;
 
-use crate::{builtins, integer, stack, stack::Stack};
+use crate::{builtins, integer, stack::Stack};
 
 /// An evaluation context.
 pub struct Context {
@@ -14,7 +14,7 @@ pub struct Context {
 #[derive(Debug, PartialEq)]
 pub enum Status {
     Ok,
-    Exit,
+    Halt,
     Err { error: Error, word: String },
 }
 
@@ -45,7 +45,7 @@ impl Context {
                 Token::Integer(b) => self.eval_integer(b),
                 Token::Word(w) => {
                     if w == "exit" || w == "q" {
-                        return Status::Exit;
+                        return Status::Halt;
                     }
                     if let Err(e) = self.eval_word(w.as_str()) {
                         return Status::Err { error: e, word: w };
@@ -83,28 +83,6 @@ impl Context {
         } else {
             Err(Error::UnknownWord)
         }
-    }
-
-    /// Returns a REPL prompt containing the elements in the stack, e.g. "(1 2) ".
-    #[must_use]
-    pub fn prompt(&self) -> String {
-        let mut prompt = String::from("(");
-
-        for item in &self.stack {
-            match item {
-                stack::Item::Float(n) => prompt.push_str(format!("{n}").as_str()),
-                stack::Item::Integer(b) => prompt.push_str(format!("{b}").as_str()),
-                stack::Item::Unit(u) => prompt.push_str(format!("{u}").as_str()),
-            };
-            prompt.push(' ');
-        }
-
-        if !self.stack.is_empty() {
-            prompt.pop();
-        }
-        prompt.push_str(") ");
-
-        prompt
     }
 
     /// Returns the names of all the builtins, in no particular order.

@@ -146,3 +146,17 @@ fn unit_factors_division() {
     assert_eq!(u.numer(), &[AMPERE]);
     assert_eq!(u.denom(), &[]);
 }
+
+#[test]
+fn psi_to_pascals() {
+    let mut ctx = eval::Context::new();
+    assert_eq!(ctx.eval("344.6790593239441 psi Pa into"), eval::Status::Ok);
+
+    let f = popf!(ctx.stack).unwrap_or_else(|e| panic!("popf: {e:?}"));
+    println!("{f}");
+    assert_eq!(f.value, 2376478.4580761734);
+
+    let u = f.unit.unwrap();
+    assert_eq!(u.numer(), &[KILOGRAM]);
+    assert_eq!(u.denom(), &[SECOND, SECOND, METER]);
+}

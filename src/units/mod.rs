@@ -74,7 +74,7 @@ pub static MIL: Base = Base::new("mil", Length, 0.000_304_8 / 12.0);
 pub static YARD: Base = Base::new("yd", Length, 0.3048 * 3.0);
 
 // More masses
-pub static POUND: Base = Base::new("lb", Mass, 0.453_592_37);
+pub static POUND_MASS: Base = Base::new("lb", Mass, 0.453_592_37);
 pub static OUNCE: Base = Base::new("oz", Mass, 0.028_349_523_125);
 
 // More temperatures
@@ -100,6 +100,12 @@ pub static NEWTON: Lazy<Unit> = Lazy::new(|| {
         .unwrap()
         .with_symbol("N")
 });
+pub static POUND_FORCE: Lazy<Unit> = Lazy::new(|| {
+    Unit::new(&[POUND_MASS, METER], &[SECOND, SECOND])
+        .unwrap()
+        .with_factor(9.80665)
+        .with_symbol("lbf")
+});
 
 // Power
 pub static WATT: Lazy<Unit> = Lazy::new(|| (&*JOULE / SECOND).unwrap().with_symbol("W"));
@@ -110,8 +116,11 @@ pub static PASCAL: Lazy<Unit> = Lazy::new(|| {
         .unwrap()
         .with_symbol("Pa")
 });
-pub static PSI: Lazy<Unit> =
-    Lazy::new(|| ((POUND / INCH).unwrap() / INCH).unwrap().with_symbol("psi"));
+pub static PSI: Lazy<Unit> = Lazy::new(|| {
+    ((&*POUND_FORCE / INCH).unwrap() / INCH)
+        .unwrap()
+        .with_symbol("psi")
+});
 
 // Electromagnetic
 pub static VOLT: Lazy<Unit> = Lazy::new(|| {

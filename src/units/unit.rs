@@ -350,6 +350,7 @@ impl std::ops::Mul<Self> for &Unit {
         numer.extend(&other.numer);
         denom.extend(&other.denom);
         Unit::new(numer.as_slice(), denom.as_slice())
+            .map(|u| u.with_factor(self.factor * other.factor))
     }
 }
 
@@ -369,9 +370,22 @@ impl std::ops::Mul<Base> for &Unit {
     /// Produces the unit that would result from multiplying a quantity in this
     /// unit with a quantity in a base unit.
     fn mul(self, other: Base) -> Result<Unit, Error> {
+        // Do cancellation of units that `simplified()` can't do, e.g. m/in.
+        for i in 0..self.denom.len() {
+            if self.denom[i].physq == other.physq {
+                let mut denom = self.denom.clone();
+                let canceled = denom.remove(i);
+
+                #[allow(clippy::suspicious_arithmetic_impl)]
+                let factor = self.factor * other.factor / canceled.factor;
+
+                return Unit::new(&self.numer, &denom).map(|u| u.with_factor(factor));
+            }
+        }
+
         let mut numer = self.numer.clone();
         numer.extend([other]);
-        Unit::new(numer.as_slice(), self.denom.as_slice())
+        Unit::new(numer.as_slice(), self.denom.as_slice()).map(|u| u.with_factor(self.factor))
     }
 }
 
@@ -386,6 +400,7 @@ impl std::ops::Div<Self> for &Unit {
         numer.extend(&other.denom);
         denom.extend(&other.numer);
         Unit::new(numer.as_slice(), denom.as_slice())
+            .map(|u| u.with_factor(self.factor / other.factor))
     }
 }
 
@@ -405,9 +420,22 @@ impl std::ops::Div<Base> for &Unit {
     /// Produces the unit that would result from dividing a quantity in this
     /// unit by a quantity in a base unit.
     fn div(self, other: Base) -> Result<Unit, Error> {
+        // Do cancellation of units that `simplified()` can't do, e.g. m/in.
+        for i in 0..self.numer.len() {
+            if self.numer[i].physq == other.physq {
+                let mut numer = self.numer.clone();
+                let canceled = numer.remove(i);
+
+                #[allow(clippy::suspicious_arithmetic_impl)]
+                let factor = self.factor / other.factor * canceled.factor;
+
+                return Unit::new(&numer, &self.denom).map(|u| u.with_factor(factor));
+            }
+        }
+
         let mut denom = self.denom.clone();
         denom.extend([other]);
-        Unit::new(self.numer.as_slice(), denom.as_slice())
+        Unit::new(self.numer.as_slice(), denom.as_slice()).map(|u| u.with_factor(self.factor))
     }
 }
 
@@ -415,7 +443,7 @@ impl std::ops::Div<Base> for &Unit {
 mod tests {
     use approx::assert_relative_eq;
 
-    use crate::units::Unit;
+    use crate::units::{Unit, INCH, POUND_MASS};
     use crate::units::{
         AMPERE, DEG_CELSIUS, DEG_FAHRENHEIT, FOOT, HOUR, KELVIN, KILOGRAM, METER, MILE,
         NAUTICAL_MILE, RANKINE, SECOND, TEMP_CELSIUS, TEMP_FAHRENHEIT, VOLT,
@@ -714,5 +742,22 @@ mod tests {
         assert_eq!(VOLT.convert(1.0, &millivolt).unwrap(), 1000.0);
         let kilovolt = VOLT.with_factor(1000.0).with_symbol("kV");
         assert_eq!(millivolt.convert(1.0, &kilovolt).unwrap(), 0.000001);
+    }
+
+    #[test]
+    fn factors_with_unit_division() {
+        let u1 = (((POUND_MASS * METER).unwrap() / SECOND).unwrap() / SECOND)
+            .unwrap()
+            .with_factor(9.80665);
+
+        let u2 = (u1 / INCH).unwrap();
+        assert_eq!(u2.numer(), &[POUND_MASS]);
+        assert_eq!(u2.denom(), &[SECOND, SECOND]);
+        assert_eq!(u2.factor(), 386.0885826771653);
+
+        let u3 = (u2 / INCH).unwrap();
+        assert_eq!(u3.numer(), &[POUND_MASS]);
+        assert_eq!(u3.denom(), &[SECOND, SECOND, INCH]);
+        assert_eq!(u3.factor(), 386.0885826771653);
     }
 }
