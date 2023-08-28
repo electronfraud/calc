@@ -26,7 +26,7 @@ pub struct Unit {
     pub symbol: Option<String>,
     numer: Vec<Base>,
     denom: Vec<Base>,
-    factor: f64,
+    constant: f64,
 }
 
 impl Unit {
@@ -52,7 +52,7 @@ impl Unit {
             symbol: None,
             numer: Vec::from(numer),
             denom: Vec::from(denom),
-            factor: 1.0,
+            constant: 1.0,
         }
         .simplified();
 
@@ -82,19 +82,19 @@ impl Unit {
             symbol: Some(String::from(symbol)),
             numer: self.numer.clone(),
             denom: self.denom.clone(),
-            factor: self.factor,
+            constant: self.constant,
         }
     }
 
     /// Returns a new `Unit` identical to this one except that it has the given
-    /// factor.
+    /// constant.
     #[must_use]
-    pub fn with_factor(&self, factor: f64) -> Self {
+    pub fn with_constant(&self, constant: f64) -> Self {
         Unit {
             symbol: self.symbol.clone(),
             numer: self.numer.clone(),
             denom: self.denom.clone(),
-            factor,
+            constant,
         }
     }
 
@@ -114,10 +114,9 @@ impl Unit {
         &self.denom
     }
 
-    /// Return this unit's factor.
     #[must_use]
-    pub fn factor(&self) -> f64 {
-        self.factor
+    pub fn constant(&self) -> f64 {
+        self.constant
     }
 
     /// Converts a number in this unit to another unit.
@@ -136,7 +135,7 @@ impl Unit {
         }
 
         // Reduce to SI
-        num *= self.factor;
+        num *= self.constant;
         for base in &self.numer {
             if let Some(z) = base.zero {
                 num -= z;
@@ -146,6 +145,7 @@ impl Unit {
         for base in &self.denom {
             num /= base.factor;
         }
+        num *= self.constant;
 
         // Raise to new unit
         for base in &other.numer {
@@ -157,7 +157,7 @@ impl Unit {
         for base in &other.denom {
             num *= base.factor;
         }
-        num /= other.factor;
+        num /= other.constant;
 
         Ok(num)
     }
@@ -240,7 +240,7 @@ impl Unit {
         let mut s_denom = Vec::from(self.denom.as_slice());
         let mut numer_ix = 0;
         let mut should_incr: bool;
-        let mut factor = self.factor;
+        let mut constant = self.constant;
 
         while numer_ix < s_numer.len() {
             should_incr = true;
@@ -254,11 +254,12 @@ impl Unit {
                     break;
                 }
 
-                // Bases measuring the same physical quantity but different
-                // factors have to be worked into the new unit's factor
+                // Bases measuring the same physical quantity but
+                // different factors have to be worked into the new
+                // unit's constant
                 if s_numer[numer_ix].physq == s_denom[denom_ix].physq {
-                    factor *= s_numer[numer_ix].factor;
-                    factor /= s_denom[denom_ix].factor;
+                    constant *= s_numer[numer_ix].factor;
+                    constant /= s_denom[denom_ix].factor;
                     s_numer.remove(numer_ix);
                     s_denom.remove(denom_ix);
                     should_incr = false;
@@ -275,7 +276,7 @@ impl Unit {
             symbol: self.symbol.clone(),
             numer: s_numer,
             denom: s_denom,
-            factor,
+            constant,
         }
     }
 }
@@ -363,7 +364,8 @@ impl std::ops::Mul<Self> for &Unit {
         let mut denom = self.denom.clone();
         numer.extend(&other.numer);
         denom.extend(&other.denom);
-        Unit::new(numer.as_slice(), denom.as_slice()).map(|u| u.with_factor(u.factor * self.factor))
+        Unit::new(numer.as_slice(), denom.as_slice())
+            .map(|u| u.with_constant(self.constant * other.constant))
     }
 }
 
@@ -383,10 +385,22 @@ impl std::ops::Mul<Base> for &Unit {
     /// Produces the unit that would result from multiplying a quantity in this
     /// unit with a quantity in a base unit.
     fn mul(self, other: Base) -> Result<Unit, Error> {
+        // Do cancellation of units that `simplified()` can't do, e.g. m/in.
+        for i in 0..self.denom.len() {
+            if self.denom[i].physq == other.physq {
+                let mut denom = self.denom.clone();
+                let canceled = denom.remove(i);
+
+                #[allow(clippy::suspicious_arithmetic_impl)]
+                let constant = self.constant * other.factor / canceled.factor;
+
+                return Unit::new(&self.numer, &denom).map(|u| u.with_constant(constant));
+            }
+        }
+
         let mut numer = self.numer.clone();
         numer.extend([other]);
-        Unit::new(numer.as_slice(), self.denom.as_slice())
-            .map(|u| u.with_factor(u.factor * self.factor))
+        Unit::new(numer.as_slice(), self.denom.as_slice()).map(|u| u.with_constant(self.constant))
     }
 }
 
@@ -400,7 +414,8 @@ impl std::ops::Div<Self> for &Unit {
         let mut denom = self.denom.clone();
         numer.extend(&other.denom);
         denom.extend(&other.numer);
-        Unit::new(numer.as_slice(), denom.as_slice()).map(|u| u.with_factor(u.factor * self.factor))
+        Unit::new(numer.as_slice(), denom.as_slice())
+            .map(|u| u.with_constant(self.constant / other.constant))
     }
 }
 
@@ -420,10 +435,22 @@ impl std::ops::Div<Base> for &Unit {
     /// Produces the unit that would result from dividing a quantity in this
     /// unit by a quantity in a base unit.
     fn div(self, other: Base) -> Result<Unit, Error> {
+        // Do cancellation of units that `simplified()` can't do, e.g. m/in.
+        for i in 0..self.numer.len() {
+            if self.numer[i].physq == other.physq {
+                let mut numer = self.numer.clone();
+                let canceled = numer.remove(i);
+
+                #[allow(clippy::suspicious_arithmetic_impl)]
+                let constant = self.constant / other.factor * canceled.factor;
+
+                return Unit::new(&numer, &self.denom).map(|u| u.with_constant(constant));
+            }
+        }
+
         let mut denom = self.denom.clone();
         denom.extend([other]);
-        Unit::new(self.numer.as_slice(), denom.as_slice())
-            .map(|u| u.with_factor(u.factor * self.factor))
+        Unit::new(self.numer.as_slice(), denom.as_slice()).map(|u| u.with_constant(self.constant))
     }
 }
 
@@ -431,7 +458,7 @@ impl std::ops::Div<Base> for &Unit {
 mod tests {
     use approx::assert_relative_eq;
 
-    use crate::units::Unit;
+    use crate::units::{Unit, INCH, POUND_MASS};
     use crate::units::{
         AMPERE, DEG_CELSIUS, DEG_FAHRENHEIT, FOOT, HOUR, KELVIN, KILOGRAM, KILOPASCAL, METER, MILE,
         NAUTICAL_MILE, NEWTON, POUND_FORCE, PSI, RANKINE, SECOND, TEMP_CELSIUS, TEMP_FAHRENHEIT,
@@ -447,7 +474,7 @@ mod tests {
             symbol: Some(String::from("J")),
             numer: vec![KILOGRAM, METER, METER],
             denom: vec![SECOND, SECOND],
-            factor: 1.0,
+            constant: 1.0,
         };
         assert_eq!(joule.to_string(), "J");
 
@@ -455,7 +482,7 @@ mod tests {
             symbol: None,
             numer: vec![KILOGRAM, METER, METER],
             denom: vec![SECOND, SECOND],
-            factor: 1.0,
+            constant: 1.0,
         };
         assert_ne!(joule.to_string(), "J");
         assert_eq!(joule.with_symbol("J").to_string(), "J");
@@ -726,11 +753,28 @@ mod tests {
     }
 
     #[test]
-    fn factors() {
-        let millivolt = VOLT.with_factor(0.001).with_symbol("mV");
+    fn constants() {
+        let millivolt = VOLT.with_constant(0.001).with_symbol("mV");
         assert_eq!(VOLT.convert(1.0, &millivolt).unwrap(), 1000.0);
-        let kilovolt = VOLT.with_factor(1000.0).with_symbol("kV");
+        let kilovolt = VOLT.with_constant(1000.0).with_symbol("kV");
         assert_eq!(millivolt.convert(1.0, &kilovolt).unwrap(), 0.000001);
+    }
+
+    #[test]
+    fn constants_with_unit_division() {
+        let u1 = (((POUND_MASS * METER).unwrap() / SECOND).unwrap() / SECOND)
+            .unwrap()
+            .with_constant(9.80665);
+
+        let u2 = (u1 / INCH).unwrap();
+        assert_eq!(u2.numer(), &[POUND_MASS]);
+        assert_eq!(u2.denom(), &[SECOND, SECOND]);
+        assert_eq!(u2.constant(), 386.0885826771653);
+
+        let u3 = (u2 / INCH).unwrap();
+        assert_eq!(u3.numer(), &[POUND_MASS]);
+        assert_eq!(u3.denom(), &[SECOND, SECOND, INCH]);
+        assert_eq!(u3.constant(), 386.0885826771653);
     }
 
     #[test]

@@ -532,8 +532,7 @@ pub fn builtin_keep(stack: &mut Stack) -> Result {
 pub fn builtin_pop(stack: &mut Stack) -> Result {
     stack
         .pop()
-        .map(|_| ())
-        .ok_or(Error::Stack(stack::Error::Underflow))
+        .map_or(Err(Error::Stack(stack::Error::Underflow)), |_| Ok(()))
 }
 
 /// `( a b -- b a )` Swaps the top two items on the stack.
@@ -703,15 +702,20 @@ pub fn table() -> Table {
         // Angle
         base!(units::DEGREE),
         // Energy
-        unit!(&*units::NEWTON),
-        // Force
         unit!(&*units::JOULE),
+        // Force
+        unit!(&*units::NEWTON),
         unit!(&*units::POUND_FORCE),
         // Power
         unit!(&*units::WATT),
         // Pressure
         unit!(&*units::PASCAL),
         unit!(&*units::PSI),
+        // Electromagnetic
+        unit!(&*units::VOLT),
+        unit!(&*units::OHM),
+        unit!(&*units::FARAD),
+        unit!(&*units::TESLA),
         // SI prefixes
         base!(units::PETASECOND),
         base!(units::TERASECOND),
