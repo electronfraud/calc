@@ -40,10 +40,7 @@ impl Number {
     #[must_use]
     pub fn with_unit(&self, unit: Unit) -> Number {
         if unit.numer().is_empty() && unit.denom().is_empty() {
-            Number {
-                value: self.value * unit.constant(),
-                unit: None,
-            }
+            Number::new(self.value * unit.constant())
         } else {
             Number {
                 value: self.value,

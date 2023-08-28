@@ -135,7 +135,6 @@ impl Unit {
         }
 
         // Reduce to SI
-        num *= self.constant;
         for base in &self.numer {
             if let Some(z) = base.zero {
                 num -= z;
@@ -240,26 +239,12 @@ impl Unit {
         let mut s_denom = Vec::from(self.denom.as_slice());
         let mut numer_ix = 0;
         let mut should_incr: bool;
-        let mut constant = self.constant;
 
         while numer_ix < s_numer.len() {
             should_incr = true;
 
             for denom_ix in 0..s_denom.len() {
-                // Identical bases can be removed
                 if s_numer[numer_ix] == s_denom[denom_ix] {
-                    s_numer.remove(numer_ix);
-                    s_denom.remove(denom_ix);
-                    should_incr = false;
-                    break;
-                }
-
-                // Bases measuring the same physical quantity but
-                // different factors have to be worked into the new
-                // unit's constant
-                if s_numer[numer_ix].physq == s_denom[denom_ix].physq {
-                    constant *= s_numer[numer_ix].factor;
-                    constant /= s_denom[denom_ix].factor;
                     s_numer.remove(numer_ix);
                     s_denom.remove(denom_ix);
                     should_incr = false;
@@ -276,7 +261,7 @@ impl Unit {
             symbol: self.symbol.clone(),
             numer: s_numer,
             denom: s_denom,
-            constant,
+            constant: self.constant,
         }
     }
 }

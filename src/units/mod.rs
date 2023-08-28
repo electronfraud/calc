@@ -272,16 +272,16 @@ pub static NANOWATT: Lazy<Unit> = Lazy::new(|| WATT.with_constant(1e-9).with_sym
 pub static PICOWATT: Lazy<Unit> = Lazy::new(|| WATT.with_constant(1e-12).with_symbol("pW"));
 pub static FEMTOWATT: Lazy<Unit> = Lazy::new(|| WATT.with_constant(1e-15).with_symbol("fW"));
 
-pub static PETAPASCAL: Lazy<Unit> = Lazy::new(|| PASCAL.with_constant(1e15).with_symbol("PP"));
-pub static TERAPASCAL: Lazy<Unit> = Lazy::new(|| PASCAL.with_constant(1e12).with_symbol("TP"));
-pub static GIGAPASCAL: Lazy<Unit> = Lazy::new(|| PASCAL.with_constant(1e9).with_symbol("GP"));
-pub static MEGAPASCAL: Lazy<Unit> = Lazy::new(|| PASCAL.with_constant(1e6).with_symbol("MP"));
-pub static KILOPASCAL: Lazy<Unit> = Lazy::new(|| PASCAL.with_constant(1e3).with_symbol("kP"));
-pub static MILLIPASCAL: Lazy<Unit> = Lazy::new(|| PASCAL.with_constant(1e-3).with_symbol("mP"));
-pub static MICROPASCAL: Lazy<Unit> = Lazy::new(|| PASCAL.with_constant(1e-6).with_symbol("uP"));
-pub static NANOPASCAL: Lazy<Unit> = Lazy::new(|| PASCAL.with_constant(1e-9).with_symbol("nP"));
-pub static PICOPASCAL: Lazy<Unit> = Lazy::new(|| PASCAL.with_constant(1e-12).with_symbol("pP"));
-pub static FEMTOPASCAL: Lazy<Unit> = Lazy::new(|| PASCAL.with_constant(1e-15).with_symbol("fP"));
+pub static PETAPASCAL: Lazy<Unit> = Lazy::new(|| PASCAL.with_constant(1e15).with_symbol("PPa"));
+pub static TERAPASCAL: Lazy<Unit> = Lazy::new(|| PASCAL.with_constant(1e12).with_symbol("TPa"));
+pub static GIGAPASCAL: Lazy<Unit> = Lazy::new(|| PASCAL.with_constant(1e9).with_symbol("GPa"));
+pub static MEGAPASCAL: Lazy<Unit> = Lazy::new(|| PASCAL.with_constant(1e6).with_symbol("MPa"));
+pub static KILOPASCAL: Lazy<Unit> = Lazy::new(|| PASCAL.with_constant(1e3).with_symbol("kPa"));
+pub static MILLIPASCAL: Lazy<Unit> = Lazy::new(|| PASCAL.with_constant(1e-3).with_symbol("mPa"));
+pub static MICROPASCAL: Lazy<Unit> = Lazy::new(|| PASCAL.with_constant(1e-6).with_symbol("uPa"));
+pub static NANOPASCAL: Lazy<Unit> = Lazy::new(|| PASCAL.with_constant(1e-9).with_symbol("nPa"));
+pub static PICOPASCAL: Lazy<Unit> = Lazy::new(|| PASCAL.with_constant(1e-12).with_symbol("pPa"));
+pub static FEMTOPASCAL: Lazy<Unit> = Lazy::new(|| PASCAL.with_constant(1e-15).with_symbol("fPa"));
 
 pub static PETAVOLT: Lazy<Unit> = Lazy::new(|| VOLT.with_constant(1e15).with_symbol("PV"));
 pub static TERAVOLT: Lazy<Unit> = Lazy::new(|| VOLT.with_constant(1e12).with_symbol("TV"));

@@ -123,7 +123,11 @@ impl Stack {
 
     /// Pushes a unit onto the stack.
     pub fn pushu(&mut self, u: units::Unit) {
-        self.0.push(Item::Unit(u));
+        if u.numer().is_empty() && u.denom().is_empty() {
+            self.pushx(u.constant());
+        } else {
+            self.0.push(Item::Unit(u));
+        }
     }
 
     /// Pushes a dimensionless floating-point number onto the stack.
@@ -243,27 +247,33 @@ impl Transaction<'_> {
 
     /// Pushes an item onto the stack.
     pub fn push(&mut self, item: Item) {
+        if let Item::Unit(u) = &item {
+            if u.numer().is_empty() && u.denom().is_empty() {
+                self.pushx(u.constant());
+                return;
+            }
+        }
         self.pushed.push(item);
     }
 
     /// Pushes a floating-point number with optional units onto the stack.
     pub fn pushf(&mut self, x: units::Number) {
-        self.pushed.push(Item::Float(x));
+        self.push(Item::Float(x));
     }
 
     /// Pushes a unit onto the stack.
     pub fn pushu(&mut self, u: units::Unit) {
-        self.pushed.push(Item::Unit(u));
+        self.push(Item::Unit(u));
     }
 
     /// Pushes a dimensionless floating-point number onto the stack.
     pub fn pushx(&mut self, x: f64) {
-        self.pushed.push(Item::Float(units::Number::new(x)));
+        self.pushf(units::Number::new(x));
     }
 
     /// Pushes an integer onto the stack.
     pub fn pushi(&mut self, x: integer::Integer) {
-        self.pushed.push(Item::Integer(x));
+        self.push(Item::Integer(x));
     }
 
     /// Commits all pops and pushes performed during this transaction to the
